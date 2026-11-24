@@ -1,0 +1,70 @@
+name: longbox-local
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: longbox
+      POSTGRES_USER: longbox
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes:
+      - longbox-local-pg:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U longbox -d longbox"]
+      interval: 10s
+      retries: 5
+
+  server:
+    image: longbox-server:0.1.0
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    env_file: .env
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/longbox
+      DATABASE_USER: longbox
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password
+      METRON_PASSWORD_FILE: /run/secrets/metron_password
+    secrets: [db_password, metron_password]
+    ports:
+      - "8080:8080"
+    networks: [internal, egress]
+
+  backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    depends_on: [db]
+    environment:
+      PGPASSFILE: /tmp/.pgpass
+    secrets: [db_password]
+    volumes:
+      - ./backups:/backups
+    networks: [internal]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mkdir -p /backups
+        echo "db:5432:longbox:longbox:$$(cat /run/secrets/db_password)" > /tmp/.pgpass && chmod 600 /tmp/.pgpass
+        while true; do
+          pg_dump -h db -U longbox -Fc longbox > /backups/longbox-$$(date +%F).dump
+          find /backups -name 'longbox-*.dump' -mtime +30 -delete
+          sleep 86400
+        done
+
+networks:
+  internal: { internal: true }
+  egress:
+    driver_opts:
+      com.docker.network.driver.mtu: "1450"
+
+secrets:
+  db_password:
+    file: ./secrets/db_password
+  metron_password:
+    file: ./secrets/metron_password
+
+volumes:
+  longbox-local-pg:

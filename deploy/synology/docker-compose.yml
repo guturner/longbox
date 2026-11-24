@@ -1,0 +1,87 @@
+# Synology DS923+ · Container Manager → Project → Create → upload this file.
+# Folder layout on the NAS (create first):  /volume1/docker/longbox/{pgdata,backups,secrets}
+#   secrets/db_password, secrets/metron_password  -> one value per file, chmod 600
+#   .env (next to this file)                       -> non-secret settings, see .env.example
+name: longbox
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: longbox
+      POSTGRES_USER: longbox
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes:
+      - /volume1/docker/longbox/pgdata:/var/lib/postgresql/data
+    networks: [internal]          # not published: only the server can reach Postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U longbox -d longbox"]
+      interval: 10s
+      retries: 5
+
+  server:
+    image: ghcr.io/guturner/longbox-server:latest
+    restart: unless-stopped
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    depends_on:
+      db: { condition: service_healthy }
+    env_file: .env
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/longbox
+      DATABASE_USER: longbox
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password
+      METRON_PASSWORD_FILE: /run/secrets/metron_password
+      BEHIND_PROXY: "true"        # DSM reverse proxy terminates TLS
+    secrets: [db_password, metron_password]
+    ports:
+      - "127.0.0.1:8080:8080"     # only the DSM reverse proxy (same box) talks to it
+    networks: [internal, egress]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+  # Nightly logical backup into a shared folder that Hyper Backup can pick up.
+  backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    depends_on: [db]
+    environment:
+      PGPASSFILE: /tmp/.pgpass
+    secrets: [db_password]
+    volumes:
+      - /volume1/docker/longbox/backups:/backups
+    networks: [internal]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "db:5432:longbox:longbox:$$(cat /run/secrets/db_password)" > /tmp/.pgpass && chmod 600 /tmp/.pgpass
+        while true; do
+          pg_dump -h db -U longbox -Fc longbox > /backups/longbox-$$(date +%F).dump
+          find /backups -name 'longbox-*.dump' -mtime +30 -delete
+          sleep 86400
+        done
+
+  # Polls GHCR hourly and restarts the server container when a new image lands.
+  # Scoped to containers with com.centurylinklabs.watchtower.enable=true.
+  # Public GHCR image — no registry credentials needed.
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --label-enable --cleanup --schedule "0 0 * * * *"
+    networks: [egress]
+
+networks:
+  internal: { internal: true }    # no internet route for the DB
+  egress: {}                      # server + watchtower need internet
+
+secrets:
+  db_password:
+    file: /volume1/docker/longbox/secrets/db_password
+  metron_password:
+    file: /volume1/docker/longbox/secrets/metron_password

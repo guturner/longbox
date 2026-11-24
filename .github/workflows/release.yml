@@ -1,0 +1,173 @@
+# Triggered by a semver tag push (e.g. v0.1.1) or manual workflow_dispatch.
+# Secrets required (repo Settings → Secrets → Actions):
+#   ANDROID_KEYSTORE_BASE64  — base64-encoded JKS: base64 -w0 longbox-release.jks
+#   ANDROID_STORE_PASSWORD   — keystore password
+#   ANDROID_KEY_ALIAS        — key alias (e.g. longbox)
+#   ANDROID_KEY_PASSWORD     — key password
+#
+# Generate a keystore (one-time):
+#   keytool -genkey -v -keystore longbox-release.jks \
+#     -alias longbox -keyalg RSA -keysize 2048 -validity 10000 \
+#     -dname "CN=Longbox, OU=Personal, O=guturner, L=Unknown, S=Unknown, C=US"
+#
+# GITHUB_TOKEN is auto-provided — no extra secret needed for GHCR push or release creation.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 0.1.0)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── 1. Resolve version and create a draft GitHub Release ──────────────────
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Create draft GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "v${{ steps.ver.outputs.version }}" \
+            --title "Longbox ${{ steps.ver.outputs.version }}" \
+            --generate-notes \
+            --draft
+
+  # ── 2. Build server + web → Docker image → push to GHCR ──────────────────
+  server-web:
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Write local.properties
+        run: echo "sdk.dir=${ANDROID_SDK_ROOT}" >> local.properties
+      - name: Build server fat jar and web distribution
+        run: ./gradlew :server:buildFatJar :webApp:wasmJsBrowserDistribution
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: server/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/guturner/longbox-server:latest
+            ghcr.io/guturner/longbox-server:${{ needs.prepare.outputs.version }}
+
+  # ── 3. Build signed release APK → upload to GitHub Release ───────────────
+  android:
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Write local.properties
+        run: echo "sdk.dir=${ANDROID_SDK_ROOT}" >> local.properties
+      - name: Compute versionCode from tag
+        id: vc
+        run: |
+          V="${{ needs.prepare.outputs.version }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$V"
+          echo "code=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))" >> "$GITHUB_OUTPUT"
+      - name: Decode keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+      - name: Assemble release APK
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/keystore.jks
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_VERSION_CODE: ${{ steps.vc.outputs.code }}
+          ANDROID_VERSION_NAME: ${{ needs.prepare.outputs.version }}
+        run: ./gradlew :androidApp:assembleRelease
+      - name: Upload APK to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release upload "v${{ needs.prepare.outputs.version }}" \
+            androidApp/build/outputs/apk/release/androidApp-release.apk \
+            --clobber
+
+  # ── 4. Build MSI on Windows → upload to GitHub Release ───────────────────
+  desktop:
+    needs: prepare
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Write local.properties
+        shell: bash
+        # Convert Windows backslashes to forward slashes for local.properties
+        run: printf 'sdk.dir=%s\n' "${ANDROID_SDK_ROOT//\\//}" >> local.properties
+      - name: Package MSI
+        shell: bash
+        env:
+          DESKTOP_VERSION: ${{ needs.prepare.outputs.version }}
+        run: ./gradlew :desktopApp:packageMsi
+      - name: Upload MSI to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release upload "v${{ needs.prepare.outputs.version }}" \
+            desktopApp/build/compose/binaries/main/msi/*.msi \
+            --clobber
+
+  # ── 5. All assets uploaded → publish the release ─────────────────────────
+  publish:
+    needs: [prepare, server-web, android, desktop]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit "v${{ needs.prepare.outputs.version }}" --draft=false

@@ -1,0 +1,14 @@
+# Local development: Postgres only. Run the server with ./gradlew :server:run
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: longbox
+      POSTGRES_USER: longbox
+      POSTGRES_PASSWORD: change-me
+    ports:
+      - "127.0.0.1:5432:5432"   # bind to loopback only
+    volumes:
+      - longbox-pg:/var/lib/postgresql/data
+volumes:
+  longbox-pg:

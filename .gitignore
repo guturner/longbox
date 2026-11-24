@@ -1,0 +1,22 @@
+# Build outputs
+.gradle/
+build/
+**/build/
+
+# IDE
+.idea/
+*.iml
+
+# Local config — secrets and env files at any depth
+local.properties
+.env
+secrets/
+*.jks
+
+# Docker local backups
+deploy/local/backups/
+*.dump
+
+# Kotlin JS/Wasm tooling cache
+kotlin-js-store/
+.kotlin/

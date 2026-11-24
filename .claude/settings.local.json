@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew :shared:data:compileKotlinDesktop:*)",
+      "Bash(./gradlew :shared:domain:jvmTest:*)",
+      "Bash(docker build:*)",
+      "Bash(docker compose:*)",
+      "Bash(curl:*)",
+      "Bash(docker exec:*)",
+      "Bash(./gradlew :androidApp:assembleDebug:*)"
+    ]
+  }
+}
