@@ -12,28 +12,29 @@ Source-code dependencies point inward only: the Dependency Rule ([UWaterloo CS 3
                  │      :shared:ui (Compose MP screens, AppGraph = client composition root)    │
                  │          │                                    │                               │
                  │  :shared:presentation (ViewModels)   :shared:data (Ktor client, outbox,     │
-                 │          │                             cache, token ports)                   │
+                 │          │                             cache, token ports, pull list)        │
                  │          │            :shared:contract (HTTP DTOs + mappers)                 │
                  │          └─────────────► :shared:domain ◄──────────────────────┘              │
                  │      entities · use cases · ports (CollectionRepository, ComicCatalog,       │
-                 │      BarcodeLookup, SyncController, SessionRepository, Clock)                │
+                 │      BarcodeLookup, SyncController, SessionRepository, PullListRepository,  │
+                 │      Clock)                                                                  │
                  └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 | Module | Ring | Depends on | Notes |
 |---|---|---|---|
-| `:shared:domain` | Entities + use cases | coroutines only | Barcode parsing, issue-number ordering, filters/facets, `ResolveBarcodeUseCase`, `CheckOwnershipUseCase`. No framework imports. |
+| `:shared:domain` | Entities + use cases | coroutines only | Barcode parsing, issue-number ordering, filters/facets, `ResolveBarcodeUseCase`, `CheckOwnershipUseCase`, `GetWeeklyReleasesUseCase`. No framework imports. |
 | `:shared:contract` | Interface adapters | domain | One HTTP DTO definition shared by the server and the clients, so the wire format can't drift. |
-| `:shared:data` | Interface adapters | contract | `OfflineFirstCollectionRepository` (outbox + cache), `ApiComicCatalog`, `ApiSessionRepository`, `LongboxApi`. |
+| `:shared:data` | Interface adapters | contract | `OfflineFirstCollectionRepository` (outbox + cache), `ApiComicCatalog`, `ApiSessionRepository`, `KeyValueStorePullListRepository`, `LongboxApi`. |
 | `:shared:presentation` | Interface adapters | domain | ViewModels expose `StateFlow` UI state. Never imports `:shared:data`. |
 | `:shared:ui` | Frameworks | presentation, data | Compose Multiplatform screens; `AppGraph` is the only client code that touches `:shared:data`. |
-| `:server` | Frameworks | contract | Ktor; its `Application.module` is the server's composition root. |
+| `:server` | Frameworks | contract | Ktor; `Application.module` is the server's composition root. |
 
 **Why Kotlin Multiplatform plus Compose Multiplatform for all three clients:** Android, desktop (JVM) and server-side JVM are *Stable* targets, and Compose UI is Stable on Android and desktop. Web on Kotlin/Wasm is *Beta* ([kotlinlang.org, stability of supported platforms](https://kotlinlang.org/docs/multiplatform/supported-platforms.html)). Beta is acceptable for a personal web client. If it bites, Kotlin/JS (Stable) is the fallback.
 
 **Windows packaging:** Compose Desktop builds an MSI through `jpackage` (`./gradlew :desktopApp:packageMsi`), with a private JRE and a per-user install.
 
-**DI:** explicit constructor injection, as in your queuehaven controllers. `AppGraph` (clients) and `Application.module` (server) are readable, single-file object graphs, and no DI framework leaks into the inner rings.
+**DI:** explicit constructor injection, as in `codex`. `AppGraph` (clients) and `Application.module` (server) are readable, single-file object graphs, and no DI framework leaks into the inner rings.
 
 ## Data source
 
@@ -68,8 +69,47 @@ The NAS is only reachable at home (or over a VPN). Each client follows Android's
 
 `CheckOwnershipUseCase` runs only against the cached library plus the outbox. Because the barcode encodes series (UPC) and issue/cover/printing (supplement), it can tell three cases apart: *you own this exact copy*, *you own this issue but a different cover/printing*, and *not owned*. Tapping **I bought it** queues an add that syncs when you get home.
 
-## Not yet built (next steps)
+## Pull list
 
-- WorkManager job so Android drains the outbox even when the app isn't open (today: on app open/resume and while running).
-- Optional Tailscale on the NAS, so roaming devices can sync immediately (see SYNOLOGY.md).
-- Pull-list subscriptions (series you follow) → "this week's books you haven't scanned yet".
+`PullListRepository` stores a list of `PullListEntry` values — either `ByPublisher(publisherName)` or `BySeries(seriesId, seriesName, publisherName)`. `KeyValueStorePullListRepository` serialises the list to JSON via `kotlinx.serialization` and writes it atomically through the same `KeyValueStore` used by the outbox.
+
+Entries are purely local — no server round-trips. The pull list is intended as a weekly shopping helper: compare it against the New Releases screen to see what you're missing.
+
+## Navigation
+
+Each secondary screen (comic detail, creator, story arc, releases, pull list) has an `onGoHome` callback wired to `nav.popBackStack(LibraryRoute, inclusive = false)`. This pops the entire back stack back to the library root without re-creating it.
+
+**Type annotation required:** `nav.popBackStack()` returns `Boolean`. Without an explicit type annotation, Kotlin infers the lambda as `() -> Boolean`, which does not satisfy `() -> Unit` and cascades into a wall of unrelated type errors at every call site. Always declare it as:
+
+```kotlin
+val goHome: () -> Unit = { nav.popBackStack(LibraryRoute, inclusive = false) }
+```
+
+## Build notes
+
+### Ktor 3.x breaking change
+
+`HttpRequestBuilder.url(urlString: String)` was removed in Ktor 3.x. Inside a request builder block, replace it with `url.takeFrom(urlString)`. The extension is in `io.ktor.http` and needs an explicit import — the compiler's "unresolved reference" message will not suggest it:
+
+```kotlin
+import io.ktor.http.takeFrom
+
+// inside get(...) { ... }
+url.takeFrom("https://example.com/api/...")
+```
+
+Fixed in `ApiRepositories.kt` and `OfflineFirstCollectionRepository.kt`.
+
+### `compileCommonMainKotlinMetadata` failure
+
+The metadata compiler reports an unresolved reference on `androidx.lifecycle.viewmodel.compose`. This is a pre-existing KMP toolchain issue — the per-target compilations (`compileAndroidMain`, `compileKotlinDesktop`, `compileKotlinWasmJs`) all succeed. Don't route around it by moving that import; it will resolve itself as the KMP toolchain matures.
+
+### Multiplatform tests
+
+Use `kotlinx.coroutines.test.runTest` for all tests in `commonTest`. `runBlocking` compiles on JVM but fails to compile for `wasmJs` and native targets.
+
+## Pending
+
+- WorkManager job so Android drains the outbox when the app isn't in the foreground.
+- ProGuard rules for `kotlinx.serialization` in the release APK — see [SECURITY.md](SECURITY.md#known-gaps).
+- Optional Tailscale on the NAS for immediate sync while roaming (see [SYNOLOGY.md](SYNOLOGY.md)).

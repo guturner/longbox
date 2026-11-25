@@ -57,6 +57,17 @@ These follow the OWASP Docker Security Cheat Sheet ([cheatsheetseries.owasp.org]
 
 ## Known gaps (deliberate, for a single-user app)
 
-- No certificate pinning. Pinning is optional in MASVS, and a home NAS cert rotates through Let's Encrypt.
-- The offline library cache isn't encrypted at rest. It holds comic metadata, not credentials, and sits inside the app sandbox or user profile. Encrypt it with the same Keystore key if you disagree.
-- No dependency-vulnerability scanning wired up yet (OWASP Docker RULE #9). Add the OWASP Dependency-Check Gradle plugin, or enable GitHub Dependabot, when the repo is pushed.
+- **ProGuard/R8 rules.** `androidApp/build.gradle.kts` sets `isMinifyEnabled = true` but includes no custom rules file. `kotlinx.serialization`'s serializer lookup relies on class names that R8 may rename or remove; without keep rules, a minified release APK will crash on launch with a `SerializationException`. Add a `proguard-rules.pro` with at minimum:
+  ```
+  -keepattributes *Annotation*, InnerClasses
+  -dontnote kotlinx.serialization.**
+  -keepclassmembers class kotlinx.serialization.json.** { *** Companion; }
+  -keepclasseswithmembers @kotlinx.serialization.Serializable class * { *; }
+  ```
+  This is the suspected cause of the 0.2.1 launch crash.
+
+- **No certificate pinning.** Pinning is optional in MASVS, and a home NAS cert rotates through Let's Encrypt.
+
+- **The offline library cache isn't encrypted at rest.** It holds comic metadata, not credentials, and sits inside the app sandbox or user profile. Encrypt it with the same Keystore key if you disagree.
+
+- **No dependency-vulnerability scanning.** Add the OWASP Dependency-Check Gradle plugin or enable GitHub Dependabot (OWASP Docker RULE #9) when the repo is public.

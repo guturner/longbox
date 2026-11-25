@@ -5,11 +5,17 @@ The DS923+ has an x86-64 AMD Ryzen CPU, so standard `linux/amd64` images (Temuri
 ## 1. Build the image (on your PC)
 
 ```bash
-./gradlew :server:buildFatJar :webApp:wasmJsBrowserDistribution
-docker build -f server/Dockerfile -t longbox-server:0.1.0 .
-docker save longbox-server:0.1.0 | gzip > longbox-server.tar.gz
+./scripts/synology-package.sh
 ```
-Container Manager → **Image → Add → Add from file** → `longbox-server.tar.gz`.
+
+This builds the fat jar, the web distribution, the Docker image, and saves it as `longbox-server-<version>.tar.gz`. Then in Container Manager: **Image → Add → Add from file** → select the `.tar.gz`.
+
+Manual equivalent:
+```bash
+./gradlew :server:buildFatJar :webApp:wasmJsBrowserDistribution
+docker build -f server/Dockerfile -t longbox-server:0.2.1 .
+docker save longbox-server:0.2.1 | gzip > longbox-server-0.2.1.tar.gz
+```
 
 ## 2. Folders and secrets on the NAS
 
@@ -27,13 +33,13 @@ File Station or SSH:
 
 ## 3. Start the project
 
-Container Manager → **Project → Create**, path `/volume1/docker/longbox`, using the existing `docker-compose.yml`. This starts three containers: `db`, `server` and `backup`.
+Container Manager → **Project → Create**, path `/volume1/docker/longbox`, using the existing `docker-compose.yml`. This starts four containers: `db`, `server`, `backup` and `watchtower`. Watchtower polls GHCR hourly and updates the server automatically when a new image is pushed.
 
 ## 4. HTTPS on your home network
 
 The server only listens on `127.0.0.1:8080` on the NAS. Put DSM's reverse proxy in front of it:
 1. **Control Panel → Login Portal → Advanced → Reverse Proxy → Create**: source `HTTPS`, host `longbox.<your-domain>`, port 443 → destination `HTTP`, `localhost`, `8080`.
-2. **Control Panel → Security → Certificate**: add a Let's Encrypt certificate for that hostname and assign it to the reverse-proxy entry. Let's Encrypt has to validate the domain; check how DSM does that for your domain before opening router ports. With Tailscale (below), `tailscale cert` issues a trusted certificate for the NAS's `*.ts.net` name without exposing anything.
+2. **Control Panel → Security → Certificate**: add a Let's Encrypt certificate for that hostname and assign it to the reverse-proxy entry. With Tailscale (below), `tailscale cert` issues a trusted cert for the NAS's `*.ts.net` name without exposing anything to the public internet.
 3. Point the hostname at the NAS's LAN IP in your router's DNS (or a local DNS override).
 
 HTTPS is required, not cosmetic: cookies are `Secure`, and Android blocks cleartext traffic.

@@ -10,6 +10,25 @@
 - **Licence:** Metron's site content is **CC BY-SA 4.0**, so every screen that shows its data carries an attribution line (`MetronAttribution`). Cover images belong to their publishers; this is a private, personal collection app, so don't republish them.
 - **Cost:** $0. Metron accepts donations through OpenCollective if you want to support it.
 
+### Publisher names
+
+The `publisher_name` parameter is case-insensitive but must match a name in Metron's publisher index. Verify with `/api/publisher/?name=<term>` before adding a new entry to `FOLLOWED_PUBLISHERS`. Known verified names:
+
+| Name in `FOLLOWED_PUBLISHERS` | Metron id | Notes |
+|---|---|---|
+| `DC Comics` | 2 | Correct. |
+| `Marvel` | — | Correct. |
+| `Dynamite Entertainment` | — | Correct. |
+| `Titan Comics` | 123 | Correct. `"Titan Books"` does **not** exist in Metron and always returns 0 results — verified via `/api/publisher/?name=Titan`. |
+
+### Numbering
+
+Metron tracks each relaunch as a separate series and uses that series' issue numbers. League of Comic Geeks and some other databases display **legacy numbers** that count continuously from the first issue of the original run (e.g., Action Comics #1105 in Metron = #1200 on LOCG, counting from 1938). Both point to the same comic. This is a display difference, not a data error, and it doesn't affect the app.
+
+### Data lag for future releases
+
+Metron is community-maintained. For weeks two or more weeks out, the entry count is typically lower than on retail-feed databases. Data fills in as the community submits issues. The app will show fewer titles for a future week than League of Comic Geeks does for the same week — this is expected.
+
 ## Not used, and why
 
 | Source | Why not |
