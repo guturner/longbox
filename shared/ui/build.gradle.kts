@@ -39,3 +39,13 @@ kotlin {
         }
     }
 }
+
+// com.android.kotlin.multiplatform.library does not wire commonMain Compose resources into the
+// Android AAR asset pipeline — CopyResourcesToAndroidAssetsTask has an unconfigured outputDirectory
+// for this plugin combination. This task bridges the gap: it assembles commonMain resources into
+// the namespace-qualified path the CMP runtime expects. androidApp picks up the output as assets.
+tasks.register<Sync>("assembleAndroidMainComposeResources") {
+    from(layout.buildDirectory.dir("generated/compose/resourceGenerator/preparedResources/commonMain/composeResources"))
+    into(layout.buildDirectory.dir("generated/compose/resourceGenerator/assembledResources/androidMain/composeResources/longbox.shared.ui.generated.resources"))
+    dependsOn("prepareComposeResourcesTaskForCommonMain")
+}

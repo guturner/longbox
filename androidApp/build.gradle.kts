@@ -1,3 +1,5 @@
+import java.util.zip.ZipFile
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
@@ -50,6 +52,42 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
+    }
+
+    // shared:ui's commonMain Compose resources assembled with the namespace prefix the CMP runtime
+    // expects. Required because com.android.kotlin.multiplatform.library doesn't wire them into
+    // the asset pipeline (see shared/ui/build.gradle.kts: assembleAndroidMainComposeResources).
+    sourceSets["main"].assets.srcDirs(
+        "../shared/ui/build/generated/compose/resourceGenerator/assembledResources/androidMain"
+    )
+}
+
+// Ensure the resource assembly runs before assets are merged.
+tasks.matching { it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets" }.configureEach {
+    dependsOn(":shared:ui:assembleAndroidMainComposeResources")
+}
+
+// Verify that the debug APK contains the CMP resources assembled above.
+// Guards against regressions where the packaging pipeline stops including them.
+// Run explicitly: ./gradlew :androidApp:verifyApkComposeResources
+tasks.register("verifyApkComposeResources") {
+    dependsOn("assembleDebug")
+    val apk = layout.buildDirectory.file("outputs/apk/debug/androidApp-debug.apk")
+    inputs.file(apk)
+    doLast {
+        val expectedEntries = listOf(
+            "assets/composeResources/longbox.shared.ui.generated.resources/drawable/longbox_logo.png"
+        )
+        ZipFile(apk.get().asFile).use { zip ->
+            for (entry in expectedEntries) {
+                requireNotNull(zip.getEntry(entry)) {
+                    "Compose resource missing from APK: $entry\n" +
+                    "Check assembleAndroidMainComposeResources in shared/ui/build.gradle.kts " +
+                    "and the sourceSets[\"main\"].assets.srcDirs wiring in androidApp/build.gradle.kts."
+                }
+            }
+        }
+        logger.lifecycle("APK resource check passed: ${expectedEntries.size} entries verified.")
     }
 }
 
