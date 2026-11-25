@@ -130,9 +130,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release upload "v${{ needs.prepare.outputs.version }}" \
-            androidApp/build/outputs/apk/release/androidApp-release.apk \
-            --clobber
+          APK=$(find androidApp/build/outputs/apk/release -name "*.apk" | head -1)
+          echo "Uploading $APK"
+          gh release upload "v${{ needs.prepare.outputs.version }}" "$APK" --clobber
 
   # ── 4. Build MSI on Windows → upload to GitHub Release ───────────────────
   desktop:
