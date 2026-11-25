@@ -32,6 +32,7 @@ import com.guturner.longbox.domain.model.Comic
 import com.guturner.longbox.domain.model.CreatorId
 import com.guturner.longbox.domain.model.CreatorRole
 import com.guturner.longbox.domain.model.EntryId
+import com.guturner.longbox.domain.model.PullListEntry
 import com.guturner.longbox.domain.model.StoryArcRef
 import com.guturner.longbox.presentation.ComicDetailViewModel
 import com.guturner.longbox.presentation.Loadable
@@ -48,6 +49,7 @@ fun ComicDetailScreen(
     onOpenCreator: (CreatorId) -> Unit,
     onOpenStoryArc: (StoryArcRef) -> Unit,
     onRemoveCopy: (EntryId) -> Unit,
+    onAddSeriesToPullList: (PullListEntry.BySeries) -> Unit = {},
 ) {
     val comic by viewModel.comic.collectAsStateWithLifecycle()
     val copies by viewModel.ownedCopies.collectAsStateWithLifecycle()
@@ -102,6 +104,18 @@ fun ComicDetailScreen(
                         }
                     }
                 }
+                HorizontalDivider()
+                TextButton(
+                    onClick = {
+                        onAddSeriesToPullList(
+                            PullListEntry.BySeries(
+                                seriesId = c.value.series.id,
+                                seriesName = c.value.series.displayName,
+                                publisherName = c.value.publisher.name,
+                            )
+                        )
+                    },
+                ) { Text("+ Track this series on pull list") }
                 MetronAttribution()
             }
         }

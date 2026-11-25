@@ -61,6 +61,7 @@ fun LibraryScreen(
     onCheckInShop: (() -> Unit)?,
     onAddManually: () -> Unit,
     onOpenReleases: () -> Unit,
+    onOpenPullList: () -> Unit,
     onSignOut: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -79,6 +80,7 @@ fun LibraryScreen(
                 navigationIcon = { HomeIconButton(onClick = {}) },
                 actions = {
                     TextButton(onClick = onOpenReleases) { Text("New Releases") }
+                    TextButton(onClick = onOpenPullList) { Text("Pull List") }
                     TextButton(onClick = { menuOpen = true }) { Text("More") }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(text = { Text("Add or check by UPC") }, onClick = { menuOpen = false; onAddManually() })

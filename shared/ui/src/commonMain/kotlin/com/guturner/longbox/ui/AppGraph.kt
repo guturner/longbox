@@ -2,11 +2,13 @@ package com.guturner.longbox.ui
 
 import com.guturner.longbox.data.local.KeyValueStore
 import com.guturner.longbox.data.remote.LongboxApi
-import com.guturner.longbox.data.repository.OfflineFirstCollectionRepository
 import com.guturner.longbox.data.repository.ApiComicCatalog
 import com.guturner.longbox.data.repository.ApiSessionRepository
+import com.guturner.longbox.data.repository.KeyValueStorePullListRepository
+import com.guturner.longbox.data.repository.OfflineFirstCollectionRepository
 import com.guturner.longbox.data.session.SessionTransport
 import com.guturner.longbox.domain.repository.Clock
+import com.guturner.longbox.domain.repository.PullListRepository
 import com.guturner.longbox.domain.repository.SyncController
 import com.guturner.longbox.domain.usecase.CheckOwnershipUseCase
 import com.guturner.longbox.domain.usecase.GetComicDetailUseCase
@@ -50,4 +52,5 @@ class AppGraph(
     val getCreator = GetCreatorUseCase(catalog)
     val getStoryArc = GetStoryArcUseCase(catalog)
     val getWeeklyReleases = GetWeeklyReleasesUseCase(catalog, clock)
+    val pullList: PullListRepository = KeyValueStorePullListRepository(localStore, appScope)
 }

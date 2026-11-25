@@ -15,10 +15,12 @@ import androidx.navigation.toRoute
 import com.guturner.longbox.domain.library.LibraryFilter
 import com.guturner.longbox.domain.model.ComicId
 import com.guturner.longbox.domain.model.CreatorId
+import com.guturner.longbox.domain.model.PullListEntry
 import com.guturner.longbox.domain.model.StoryArcId
 import com.guturner.longbox.presentation.ComicDetailViewModel
 import com.guturner.longbox.presentation.CreatorViewModel
 import com.guturner.longbox.presentation.LibraryViewModel
+import com.guturner.longbox.presentation.PullListViewModel
 import com.guturner.longbox.presentation.ReleasesViewModel
 import com.guturner.longbox.presentation.ScanMode
 import com.guturner.longbox.presentation.ScanViewModel
@@ -39,6 +41,7 @@ import kotlinx.serialization.Serializable
 @Serializable internal data class CreatorRoute(val id: Long)
 @Serializable internal data class StoryArcRoute(val id: Long)
 @Serializable internal data object ReleasesRoute
+@Serializable internal data object PullListRoute
 @Serializable internal data class ScanRoute(val check: Boolean)
 
 /** Root of every client. Platform shells only supply [graph] and [platform]. */
@@ -64,6 +67,7 @@ private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: 
     val library = viewModel {
         LibraryViewModel(graph.observeLibrary, graph.refreshCollection, graph.removeFromCollection, graph.sync)
     }
+    val pullListVm = viewModel { PullListViewModel(graph.pullList, graph.collectionRepository) }
     val manualScan = viewModel(key = "manual-scan") { ScanViewModel(graph.scanComic, graph.checkOwnership, graph.nowMillis) }
     var showManualEntry by remember { mutableStateOf(false) }
 
@@ -76,6 +80,7 @@ private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: 
                 onCheckInShop = platform.scanner?.let { { nav.navigate(ScanRoute(check = true)) } },
                 onAddManually = { showManualEntry = true },
                 onOpenReleases = { nav.navigate(ReleasesRoute) },
+                onOpenPullList = { nav.navigate(PullListRoute) },
                 onSignOut = onSignOut,
             )
         }
@@ -88,6 +93,7 @@ private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: 
                 onOpenCreator = { nav.navigate(CreatorRoute(it.value)) },
                 onOpenStoryArc = { nav.navigate(StoryArcRoute(it.id.value)) },
                 onRemoveCopy = library::remove,
+                onAddSeriesToPullList = pullListVm::addSeries,
             )
         }
         composable<CreatorRoute> { entry ->
@@ -112,6 +118,9 @@ private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: 
         composable<ReleasesRoute> {
             val vm = viewModel { ReleasesViewModel(graph.getWeeklyReleases, graph.collectionRepository, graph.clock) }
             ReleasesScreen(vm, onGoHome = goHome)
+        }
+        composable<PullListRoute> {
+            PullListScreen(pullListVm, onGoHome = goHome)
         }
         composable<ScanRoute> { entry ->
             val scanner = platform.scanner ?: return@composable
