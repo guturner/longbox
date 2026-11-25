@@ -45,6 +45,7 @@ compose.desktop {
                 shortcut = true
                 perUserInstall = true // no admin rights needed
                 upgradeUuid = "6f1d3c4e-5c1b-4d8e-9a59-1f0b3b8f2a10"
+                iconFile.set(project.file("src/desktopMain/resources/icon.ico"))
             }
         }
     }

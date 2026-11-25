@@ -1,15 +1,21 @@
 package com.guturner.longbox.ui
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -27,20 +33,24 @@ import com.guturner.longbox.presentation.ReleasesViewModel
 import com.guturner.longbox.presentation.SessionViewModel
 import com.guturner.longbox.ui.components.CenteredMessage
 import com.guturner.longbox.ui.components.CoverImage
+import com.guturner.longbox.ui.components.HomeIconButton
 import com.guturner.longbox.ui.components.MetronAttribution
 import kotlinx.coroutines.launch
+import longbox.shared.ui.generated.resources.Res
+import longbox.shared.ui.generated.resources.longbox_logo
+import org.jetbrains.compose.resources.painterResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReleasesScreen(viewModel: ReleasesViewModel, onBack: () -> Unit) {
+fun ReleasesScreen(viewModel: ReleasesViewModel, onGoHome: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val owned by viewModel.ownedIds.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("New comics · week of ${state.week.wednesday}") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
+                title = { Text("New Releases · ${state.week.wednesday}") },
+                navigationIcon = { HomeIconButton(onGoHome) },
                 actions = {
                     TextButton(onClick = viewModel::previousWeek) { Text("‹ Prev") }
                     TextButton(onClick = viewModel::nextWeek) { Text("Next ›") }
@@ -48,27 +58,44 @@ fun ReleasesScreen(viewModel: ReleasesViewModel, onBack: () -> Unit) {
             )
         },
     ) { padding ->
-        when (val comics = state.comics) {
-            Loadable.Loading -> CenteredMessage("Loading…", Modifier.padding(padding))
-            is Loadable.Failed -> CenteredMessage(
-                comics.message.text + "\nNew releases need the home server.", Modifier.padding(padding),
-            )
-            is Loadable.Ready -> LazyColumn(
-                Modifier.fillMaxSize().padding(padding),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(comics.value, key = { it.id.value }) { comic ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        CoverImage(comic.coverA.imageUrl, comic.displayTitle, Modifier.width(64.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(comic.displayTitle, style = MaterialTheme.typography.titleSmall)
-                            Text(comic.publisher.name, style = MaterialTheme.typography.labelMedium)
-                        }
-                        if (comic.id in owned) Text("✓ Owned", color = MaterialTheme.colorScheme.primary)
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            if (state.availablePublishers.isNotEmpty()) {
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    state.availablePublishers.forEach { publisher ->
+                        FilterChip(
+                            selected = publisher in state.enabledPublishers,
+                            onClick = { viewModel.togglePublisher(publisher) },
+                            label = { Text(publisher) },
+                        )
                     }
                 }
-                item { MetronAttribution() }
+            }
+
+            when (val comics = state.comics) {
+                Loadable.Loading -> CenteredMessage("Loading…", Modifier.weight(1f))
+                is Loadable.Failed -> CenteredMessage(
+                    comics.message.text + "\nNew releases need the home server.", Modifier.weight(1f),
+                )
+                is Loadable.Ready -> LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    items(comics.value, key = { it.id.value }) { comic ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            CoverImage(comic.coverA.imageUrl, comic.displayTitle, Modifier.width(64.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(comic.displayTitle, style = MaterialTheme.typography.titleSmall)
+                                Text(comic.publisher.name, style = MaterialTheme.typography.labelMedium)
+                            }
+                            if (comic.id in owned) Text("✓ Owned", color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    item { MetronAttribution() }
+                }
             }
         }
     }
@@ -85,7 +112,11 @@ fun SignInScreen(viewModel: SessionViewModel) {
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Longbox", style = MaterialTheme.typography.displaySmall)
+        Image(
+            painter = painterResource(Res.drawable.longbox_logo),
+            contentDescription = "Longbox",
+            modifier = Modifier.size(160.dp),
+        )
         Text("Your comic collection, on every screen.")
         Button(onClick = { scope.launch { viewModel.onGoogleIdToken(platform.requestGoogleIdToken()) } }) {
             Text("Sign in with Google")
