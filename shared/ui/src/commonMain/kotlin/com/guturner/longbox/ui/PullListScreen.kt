@@ -53,7 +53,7 @@ private val MONTH_ABBR = arrayOf("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit, coverSize: CoverSize, onCoverSizeChange: (CoverSize) -> Unit) {
+internal fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit, coverSize: CoverSize, onCoverSizeChange: (CoverSize) -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showAddPublisher by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }

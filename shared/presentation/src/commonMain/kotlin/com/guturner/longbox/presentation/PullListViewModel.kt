@@ -117,7 +117,7 @@ class PullListViewModel(
         val comics = (loadedComics.value as? Loadable.Ready)?.value
             ?: return UpcScanResult.NOT_READY
         val normalised = mainCode.trimStart('0')
-        val comic = comics.firstOrNull { it.upc.trimStart('0') == normalised }
+        val comic = comics.firstOrNull { it.upc?.trimStart('0') == normalised }
             ?: return UpcScanResult.NOT_FOUND
         viewModelScope.launch { pullList.toggleCheck(week.value.start, comic.id) }
         return UpcScanResult.CHECKED

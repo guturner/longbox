@@ -44,7 +44,7 @@ class AppGraph(
     private val api = LongboxApi(engine, baseUrl, transport)
 
     private val _coverSize = MutableStateFlow(CoverSize.MEDIUM)
-    val coverSize: StateFlow<CoverSize> = _coverSize.asStateFlow()
+    internal val coverSize: StateFlow<CoverSize> = _coverSize.asStateFlow()
 
     init {
         appScope.launch {
@@ -54,7 +54,7 @@ class AppGraph(
         }
     }
 
-    fun setCoverSize(size: CoverSize) {
+    internal fun setCoverSize(size: CoverSize) {
         _coverSize.value = size
         appScope.launch { localStore.write(StoreKeys.COVER_SIZE, size.name) }
     }

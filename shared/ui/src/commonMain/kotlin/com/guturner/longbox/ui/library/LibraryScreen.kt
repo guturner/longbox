@@ -55,7 +55,7 @@ private enum class FacetKind(val label: String) { SERIES("Title"), WRITER("Write
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(
+internal fun LibraryScreen(
     viewModel: LibraryViewModel,
     onOpenComic: (ComicId) -> Unit,
     onScan: (() -> Unit)?,
@@ -168,7 +168,7 @@ fun LibraryScreen(
                         LibraryTile(
                             entry,
                             onClick = { entry.comic?.let { onOpenComic(it.id) } },
-                            onDismiss = if (entry.status == LookupStatus.NOT_FOUND) { { viewModel.remove(entry) } } else null,
+                            onDismiss = if (entry.status == LookupStatus.NOT_FOUND) { { viewModel.remove(entry.id) } } else null,
                         )
                     }
                 }

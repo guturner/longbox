@@ -48,7 +48,7 @@ import org.jetbrains.compose.resources.painterResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReleasesScreen(viewModel: ReleasesViewModel, onGoHome: () -> Unit, coverSize: CoverSize, onCoverSizeChange: (CoverSize) -> Unit) {
+internal fun ReleasesScreen(viewModel: ReleasesViewModel, onGoHome: () -> Unit, coverSize: CoverSize, onCoverSizeChange: (CoverSize) -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val owned by viewModel.ownedIds.collectAsStateWithLifecycle()
     var sizeMenuOpen by remember { mutableStateOf(false) }
