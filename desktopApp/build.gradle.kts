@@ -6,12 +6,27 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+val desktopVersion = System.getenv("DESKTOP_VERSION") ?: "0.1.0"
+
+// Generate Version.kt so APP_VERSION in Main.kt always matches the actual release build.
+val generateVersionKt by tasks.registering {
+    val outDir = layout.buildDirectory.dir("generated/kotlin")
+    outputs.dir(outDir)
+    doLast {
+        outDir.get().file("com/guturner/longbox/desktop/Version.kt").asFile.apply {
+            parentFile.mkdirs()
+            writeText("package com.guturner.longbox.desktop\n\ninternal const val APP_VERSION = \"$desktopVersion\"\n")
+        }
+    }
+}
+
 kotlin {
     jvmToolchain(21)
     jvm("desktop")
 
     sourceSets {
         val desktopMain by getting {
+            kotlin.srcDir(generateVersionKt.map { it.outputs.files.singleFile })
             dependencies {
                 implementation(project(":shared:ui"))
                 implementation(compose.desktop.currentOs)
@@ -31,7 +46,7 @@ compose.desktop {
             targetFormats(TargetFormat.Msi)
             modules("jdk.httpserver") // loopback OAuth redirect listener
             packageName = "Longbox"
-            packageVersion = System.getenv("DESKTOP_VERSION") ?: "0.1.0"
+            packageVersion = desktopVersion
             windows {
                 menu = true
                 shortcut = true

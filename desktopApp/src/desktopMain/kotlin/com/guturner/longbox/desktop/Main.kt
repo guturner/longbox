@@ -36,7 +36,7 @@ import java.nio.file.StandardCopyOption
 import java.time.LocalDate
 import java.util.Properties
 
-private const val APP_VERSION = "0.1.0"
+// APP_VERSION is generated into Version.kt at build time from the DESKTOP_VERSION env var.
 private const val RELEASES_API = "https://api.github.com/repos/guturner/longbox/releases/latest"
 
 fun main() {
