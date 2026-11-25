@@ -64,12 +64,13 @@ fun LibraryScreen(
     onOpenReleases: () -> Unit,
     onOpenPullList: () -> Unit,
     onSignOut: () -> Unit,
+    coverSize: CoverSize,
+    onCoverSizeChange: (CoverSize) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var openFacet by remember { mutableStateOf<FacetKind?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
-    var coverSize by remember { mutableStateOf(CoverSize.MEDIUM) }
 
     LaunchedEffect(state.message) {
         state.message?.let { snackbar.showSnackbar(it.text); viewModel.dismissMessage() }
@@ -96,7 +97,7 @@ fun LibraryScreen(
                             DropdownMenuItem(
                                 text = { Text("Covers: ${size.label}") },
                                 trailingIcon = if (coverSize == size) { { Text("✓") } } else null,
-                                onClick = { menuOpen = false; coverSize = size },
+                                onClick = { menuOpen = false; onCoverSizeChange(size) },
                             )
                         }
                     }

@@ -48,10 +48,9 @@ import org.jetbrains.compose.resources.painterResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReleasesScreen(viewModel: ReleasesViewModel, onGoHome: () -> Unit) {
+fun ReleasesScreen(viewModel: ReleasesViewModel, onGoHome: () -> Unit, coverSize: CoverSize, onCoverSizeChange: (CoverSize) -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val owned by viewModel.ownedIds.collectAsStateWithLifecycle()
-    var coverSize by remember { mutableStateOf(CoverSize.MEDIUM) }
     var sizeMenuOpen by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -68,7 +67,7 @@ fun ReleasesScreen(viewModel: ReleasesViewModel, onGoHome: () -> Unit) {
                             DropdownMenuItem(
                                 text = { Text("Covers: ${size.label}") },
                                 trailingIcon = if (coverSize == size) { { Text("✓") } } else null,
-                                onClick = { sizeMenuOpen = false; coverSize = size },
+                                onClick = { sizeMenuOpen = false; onCoverSizeChange(size) },
                             )
                         }
                     }

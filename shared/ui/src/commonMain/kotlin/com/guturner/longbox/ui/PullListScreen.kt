@@ -52,10 +52,9 @@ private val MONTH_ABBR = arrayOf("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit) {
+fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit, coverSize: CoverSize, onCoverSizeChange: (CoverSize) -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showAddPublisher by remember { mutableStateOf(false) }
-    var coverSize by remember { mutableStateOf(CoverSize.MEDIUM) }
     var sizeMenuOpen by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -83,7 +82,7 @@ fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit) {
                             DropdownMenuItem(
                                 text = { Text("Covers: ${size.label}") },
                                 trailingIcon = if (coverSize == size) { { Text("✓") } } else null,
-                                onClick = { sizeMenuOpen = false; coverSize = size },
+                                onClick = { sizeMenuOpen = false; onCoverSizeChange(size) },
                             )
                         }
                     }

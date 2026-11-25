@@ -55,6 +55,7 @@ data class Outbox(val changes: List<PendingChange> = emptyList())
 object StoreKeys {
     const val LIBRARY = "library-cache-v1"
     const val OUTBOX = "outbox-v1"
+    const val COVER_SIZE = "cover-size-v1"
 }
 
 /** Used in tests and as a fallback when a platform has no persistent storage. */

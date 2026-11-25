@@ -28,6 +28,7 @@ import com.guturner.longbox.presentation.SessionPhase
 import com.guturner.longbox.presentation.SessionViewModel
 import com.guturner.longbox.presentation.StoryArcViewModel
 import com.guturner.longbox.ui.components.CenteredMessage
+import com.guturner.longbox.ui.components.CoverSize
 import com.guturner.longbox.ui.detail.ComicDetailScreen
 import com.guturner.longbox.ui.detail.CreatorScreen
 import com.guturner.longbox.ui.detail.StoryArcScreen
@@ -70,6 +71,7 @@ private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: 
     val pullListVm = viewModel { PullListViewModel(graph.pullList, graph.collectionRepository, graph.getWeeklyReleases, graph.clock) }
     val manualScan = viewModel(key = "manual-scan") { ScanViewModel(graph.scanComic, graph.checkOwnership, graph.nowMillis) }
     var showManualEntry by remember { mutableStateOf(false) }
+    val coverSize by graph.coverSize.collectAsStateWithLifecycle()
 
     NavHost(nav, startDestination = LibraryRoute) {
         composable<LibraryRoute> {
@@ -82,6 +84,8 @@ private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: 
                 onOpenReleases = { nav.navigate(ReleasesRoute) },
                 onOpenPullList = { nav.navigate(PullListRoute) },
                 onSignOut = onSignOut,
+                coverSize = coverSize,
+                onCoverSizeChange = graph::setCoverSize,
             )
         }
         composable<ComicRoute> { entry ->
@@ -117,10 +121,10 @@ private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: 
         }
         composable<ReleasesRoute> {
             val vm = viewModel { ReleasesViewModel(graph.getWeeklyReleases, graph.collectionRepository, graph.clock) }
-            ReleasesScreen(vm, onGoHome = goHome)
+            ReleasesScreen(vm, onGoHome = goHome, coverSize = coverSize, onCoverSizeChange = graph::setCoverSize)
         }
         composable<PullListRoute> {
-            PullListScreen(pullListVm, onGoHome = goHome)
+            PullListScreen(pullListVm, onGoHome = goHome, coverSize = coverSize, onCoverSizeChange = graph::setCoverSize)
         }
         composable<ScanRoute> { entry ->
             val scanner = platform.scanner ?: return@composable

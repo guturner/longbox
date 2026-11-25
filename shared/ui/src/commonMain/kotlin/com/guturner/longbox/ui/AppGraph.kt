@@ -1,6 +1,7 @@
 package com.guturner.longbox.ui
 
 import com.guturner.longbox.data.local.KeyValueStore
+import com.guturner.longbox.data.local.StoreKeys
 import com.guturner.longbox.data.remote.LongboxApi
 import com.guturner.longbox.data.repository.ApiComicCatalog
 import com.guturner.longbox.data.repository.ApiSessionRepository
@@ -19,8 +20,13 @@ import com.guturner.longbox.domain.usecase.ObserveLibraryUseCase
 import com.guturner.longbox.domain.usecase.RefreshCollectionUseCase
 import com.guturner.longbox.domain.usecase.RemoveFromCollectionUseCase
 import com.guturner.longbox.domain.usecase.ScanComicUseCase
+import com.guturner.longbox.ui.components.CoverSize
 import io.ktor.client.engine.HttpClientEngine
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * Client composition root (manual constructor injection). Each app module builds one of these
@@ -30,12 +36,28 @@ class AppGraph(
     engine: HttpClientEngine,
     baseUrl: String,
     transport: SessionTransport,
-    localStore: KeyValueStore,
-    appScope: CoroutineScope,
+    private val localStore: KeyValueStore,
+    private val appScope: CoroutineScope,
     val clock: Clock,
     val nowMillis: () -> Long,
 ) {
     private val api = LongboxApi(engine, baseUrl, transport)
+
+    private val _coverSize = MutableStateFlow(CoverSize.MEDIUM)
+    val coverSize: StateFlow<CoverSize> = _coverSize.asStateFlow()
+
+    init {
+        appScope.launch {
+            localStore.read(StoreKeys.COVER_SIZE)
+                ?.let { name -> CoverSize.entries.find { it.name == name } }
+                ?.let { _coverSize.value = it }
+        }
+    }
+
+    fun setCoverSize(size: CoverSize) {
+        _coverSize.value = size
+        appScope.launch { localStore.write(StoreKeys.COVER_SIZE, size.name) }
+    }
 
     private val offlineFirst = OfflineFirstCollectionRepository(api, localStore, appScope, nowMillis)
     val collectionRepository = offlineFirst
