@@ -13,7 +13,7 @@ android {
             val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
             if (keystorePath != null) {
                 storeFile = file(keystorePath)
-                storePassword = System.getenv("ANDROID_STORE_PASSWORD")
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("ANDROID_KEY_ALIAS")
                 keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
             }
@@ -41,7 +41,7 @@ android {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            if (System.getenv("ANDROID_KEYSTORE_PATH") != null) {
+            if (System.getenv("ANDROID_KEYSTORE_PATH") != null && System.getenv("ANDROID_KEYSTORE_PASSWORD") != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
         }

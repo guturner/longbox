@@ -113,13 +113,13 @@ jobs:
         run: printf '%s' "$KEYSTORE_B64" | base64 --decode > keystore.jks
       - name: Verify keystore
         env:
-          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: keytool -list -keystore keystore.jks -storepass "$ANDROID_STORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS"
       - name: Assemble release APK
         env:
           ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/keystore.jks
-          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_VERSION_CODE: ${{ steps.vc.outputs.code }}
