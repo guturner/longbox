@@ -165,7 +165,11 @@ fun LibraryScreen(
                     modifier = Modifier.weight(1f),
                 ) {
                     items(state.entries, key = { it.id.value }) { entry ->
-                        LibraryTile(entry, onClick = { entry.comic?.let { onOpenComic(it.id) } })
+                        LibraryTile(
+                            entry,
+                            onClick = { entry.comic?.let { onOpenComic(it.id) } },
+                            onDismiss = if (entry.status == LookupStatus.NOT_FOUND) { { viewModel.remove(entry) } } else null,
+                        )
                     }
                 }
             }
@@ -225,7 +229,7 @@ private val LibrarySort.label: String
     }
 
 @Composable
-private fun LibraryTile(entry: CollectionEntry, onClick: () -> Unit) {
+private fun LibraryTile(entry: CollectionEntry, onClick: () -> Unit, onDismiss: (() -> Unit)? = null) {
     val comic = entry.comic
     Column(Modifier.clickable(enabled = comic != null, onClick = onClick)) {
         when {
@@ -233,6 +237,9 @@ private fun LibraryTile(entry: CollectionEntry, onClick: () -> Unit) {
             entry.isQueuedOnDevice -> PendingCover("Saved offline\n${entry.scannedCode}")
             entry.status == LookupStatus.PENDING -> PendingCover("Looking up\n${entry.scannedCode}")
             else -> PendingCover("Not in catalog yet\n${entry.scannedCode}")
+        }
+        onDismiss?.let { dismiss ->
+            TextButton(onClick = dismiss, modifier = Modifier.padding(top = 2.dp)) { Text("Remove") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
             Text(
