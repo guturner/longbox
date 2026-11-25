@@ -204,8 +204,8 @@ internal fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit, 
 
     if (scanning) {
         platform.scanner?.Content(
-            onDetected = { mainCode, _ ->
-                val result = viewModel.checkOffByUpc(mainCode)
+            onDetected = { mainCode, addOn ->
+                val result = viewModel.checkOffByUpc(mainCode, addOn)
                 when (result) {
                     UpcScanResult.CHECKED -> {
                         scope.launch { snackbar.showSnackbar("Checked off!") }

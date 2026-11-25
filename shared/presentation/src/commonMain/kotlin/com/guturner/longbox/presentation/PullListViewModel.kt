@@ -112,12 +112,21 @@ class PullListViewModel(
         viewModelScope.launch { pullList.toggleSkip(week.value.start, comicId) }
     }
 
-    /** Called when a barcode is scanned from the pull list screen. Checks off the matching comic if found. */
-    fun checkOffByUpc(mainCode: String): UpcScanResult {
+    /**
+     * Called when a barcode is scanned from the pull list screen. Checks off the matching comic if found.
+     *
+     * Matching strategy (handles publishers that store 12-digit vs 17-digit UPCs in Metron):
+     * 1. Full exact match on 12-digit + 5-digit supplement (most precise, when addOn is available)
+     * 2. Prefix match on 12-digit main code only (covers Titan Comics and others whose Metron UPC
+     *    includes the supplement but the scanner only returns the main code)
+     */
+    fun checkOffByUpc(mainCode: String, addOn: String? = null): UpcScanResult {
         val comics = (loadedComics.value as? Loadable.Ready)?.value
             ?: return UpcScanResult.NOT_READY
-        val normalised = mainCode.trimStart('0')
-        val comic = comics.firstOrNull { it.upc?.trimStart('0') == normalised }
+        val normMain = mainCode.trimStart('0')
+        val normFull = addOn?.let { (mainCode + it).trimStart('0') }
+        val comic = normFull?.let { full -> comics.firstOrNull { it.upc?.trimStart('0') == full } }
+            ?: comics.firstOrNull { it.upc?.trimStart('0').let { upc -> upc != null && upc.startsWith(normMain) } }
             ?: return UpcScanResult.NOT_FOUND
         viewModelScope.launch { pullList.toggleCheck(week.value.start, comic.id) }
         return UpcScanResult.CHECKED
