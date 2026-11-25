@@ -128,7 +128,9 @@ fun main() {
                         serverUrl = updated.serverUrl
                         showSettings = false
                     },
-                    onDismiss = { showSettings = false },
+                    // Don't allow dismissing on first run until a real URL is configured.
+                    // The user can still Quit via Longbox > Quit.
+                    onDismiss = { if (serverUrl != DEFAULT_SERVER_URL) showSettings = false },
                 )
             }
         }
