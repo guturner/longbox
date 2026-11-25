@@ -7,8 +7,12 @@ import com.guturner.longbox.domain.model.map
 import com.guturner.longbox.domain.repository.Clock
 import com.guturner.longbox.domain.repository.ComicCatalog
 
-/** Publishers the pull list cares about. Metron uses these publisher names. */
-val FOLLOWED_PUBLISHERS = setOf("DC Comics", "Marvel", "Dynamite Entertainment", "Titan Books", "Titan Comics")
+/**
+ * Publishers the pull list cares about. Names must match Metron's publisher index exactly.
+ * Verified against https://metron.cloud/api/publisher/ — "Titan Books" does not exist in Metron;
+ * the correct entry is "Titan Comics".
+ */
+val FOLLOWED_PUBLISHERS = setOf("DC Comics", "Marvel", "Dynamite Entertainment", "Titan Comics")
 
 data class ReleaseWeek(val start: CalendarDate, val end: CalendarDate) {
     companion object {
