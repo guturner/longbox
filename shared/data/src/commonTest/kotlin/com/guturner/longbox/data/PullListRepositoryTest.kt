@@ -166,6 +166,62 @@ class PullListRepositoryTest {
         assertEquals(setOf(comic1, comic2), checked)
     }
 
+    // — week skip tests —
+
+    @Test
+    fun weekSkipsStartEmpty() = runTest {
+        val skipped = repo().observeWeekSkips(week1).first()
+        assertTrue(skipped.isEmpty())
+    }
+
+    @Test
+    fun toggleSkipAddsComicId() = runTest {
+        val r = repo()
+        r.toggleSkip(week1, comic1)
+        val skipped = r.observeWeekSkips(week1).first()
+        assertTrue(comic1 in skipped)
+    }
+
+    @Test
+    fun toggleSkipRemovesIfAlreadySkipped() = runTest {
+        val r = repo()
+        r.toggleSkip(week1, comic1)
+        r.toggleSkip(week1, comic1)
+        val skipped = r.observeWeekSkips(week1).first()
+        assertFalse(comic1 in skipped)
+    }
+
+    @Test
+    fun skipsAreWeekScoped() = runTest {
+        val r = repo()
+        r.toggleSkip(week1, comic1)
+        val week2Skips = r.observeWeekSkips(week2).first()
+        assertTrue(week2Skips.isEmpty())
+    }
+
+    @Test
+    fun skipsAndChecksAreIndependent() = runTest {
+        val r = repo()
+        r.toggleCheck(week1, comic1)
+        r.toggleSkip(week1, comic2)
+        assertTrue(comic1 in r.observeWeekChecks(week1).first())
+        assertFalse(comic2 in r.observeWeekChecks(week1).first())
+        assertFalse(comic1 in r.observeWeekSkips(week1).first())
+        assertTrue(comic2 in r.observeWeekSkips(week1).first())
+    }
+
+    @Test
+    fun weekSkipsPersistAcrossRestart() = runTest {
+        val store = InMemoryKeyValueStore()
+        val r1 = repo(store)
+        r1.toggleSkip(week1, comic1)
+        r1.toggleSkip(week1, comic2)
+
+        val r2 = repo(store)
+        val skipped = r2.observeWeekSkips(week1).first()
+        assertEquals(setOf(comic1, comic2), skipped)
+    }
+
     // — helpers —
 
     private fun makeDcComic(): com.guturner.longbox.domain.model.Comic {

@@ -22,6 +22,7 @@ import kotlinx.serialization.json.Json
 private val json = Json { ignoreUnknownKeys = true }
 private const val LIST_KEY = "pull-list-v1"
 private const val CHECKS_KEY = "pull-list-checks-v1"
+private const val SKIPS_KEY = "pull-list-skips-v1"
 
 // ── pull list entries ─────────────────────────────────────────────────────────
 
@@ -58,6 +59,7 @@ class KeyValueStorePullListRepository(
     private val state = MutableStateFlow<List<PullListEntry>>(emptyList())
     // weekStart.toString() → Set<ComicId>
     private val checks = MutableStateFlow<Map<String, Set<Long>>>(emptyMap())
+    private val skips  = MutableStateFlow<Map<String, Set<Long>>>(emptyMap())
 
     init {
         appScope.launch { load() }
@@ -71,6 +73,10 @@ class KeyValueStorePullListRepository(
         store.read(CHECKS_KEY)
             ?.let { runCatching { json.decodeFromString(StoredChecks.serializer(), it) }.getOrNull() }
             ?.let { checks.value = it.weeks.mapValues { (_, ids) -> ids.toSet() } }
+
+        store.read(SKIPS_KEY)
+            ?.let { runCatching { json.decodeFromString(StoredChecks.serializer(), it) }.getOrNull() }
+            ?.let { skips.value = it.weeks.mapValues { (_, ids) -> ids.toSet() } }
     }
 
     override fun observe(): Flow<List<PullListEntry>> = state.asStateFlow()
@@ -106,8 +112,26 @@ class KeyValueStorePullListRepository(
         store.write(LIST_KEY, json.encodeToString(StoredPullList.serializer(), stored))
     }
 
+    override fun observeWeekSkips(weekStart: CalendarDate): Flow<Set<ComicId>> =
+        skips.map { map -> map[weekStart.toString()]?.map { ComicId(it) }?.toSet() ?: emptySet() }
+
+    override suspend fun toggleSkip(weekStart: CalendarDate, comicId: ComicId) {
+        val key = weekStart.toString()
+        skips.update { map ->
+            val current = map[key] ?: emptySet()
+            val updated = if (comicId.value in current) current - comicId.value else current + comicId.value
+            map + (key to updated)
+        }
+        persistSkips()
+    }
+
     private suspend fun persistChecks() {
         val stored = StoredChecks(checks.value.mapValues { (_, ids) -> ids.toList() })
         store.write(CHECKS_KEY, json.encodeToString(StoredChecks.serializer(), stored))
+    }
+
+    private suspend fun persistSkips() {
+        val stored = StoredChecks(skips.value.mapValues { (_, ids) -> ids.toList() })
+        store.write(SKIPS_KEY, json.encodeToString(StoredChecks.serializer(), stored))
     }
 }

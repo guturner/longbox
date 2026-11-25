@@ -19,6 +19,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,11 +30,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.guturner.longbox.domain.model.ComicId
 import com.guturner.longbox.domain.model.PullListEntry
 import com.guturner.longbox.presentation.Loadable
 import com.guturner.longbox.presentation.PullListViewModel
@@ -40,6 +46,9 @@ import com.guturner.longbox.ui.components.CoverImage
 import com.guturner.longbox.ui.components.CoverSize
 import com.guturner.longbox.ui.components.HomeIconButton
 import com.guturner.longbox.ui.components.MetronAttribution
+import kotlinx.coroutines.launch
+
+private val MONTH_ABBR = arrayOf("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,15 +57,25 @@ fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit) {
     var showAddPublisher by remember { mutableStateOf(false) }
     var coverSize by remember { mutableStateOf(CoverSize.MEDIUM) }
     var sizeMenuOpen by remember { mutableStateOf(false) }
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val platform = LocalPlatform.current
+    var scanning by remember { mutableStateOf(false) }
+
+    val wed = state.week.wednesday
+    val dateLabel = "${MONTH_ABBR[wed.month - 1]} ${wed.day}"
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Pull List · ${state.week.wednesday}") },
+                title = { Text("Pull List · $dateLabel") },
                 navigationIcon = { HomeIconButton(onGoHome) },
                 actions = {
-                    TextButton(onClick = viewModel::previousWeek) { Text("‹ Prev") }
-                    TextButton(onClick = viewModel::nextWeek) { Text("Next ›") }
+                    TextButton(onClick = viewModel::previousWeek) { Text("‹") }
+                    TextButton(onClick = viewModel::nextWeek) { Text("›") }
+                    if (platform.scanner != null) {
+                        TextButton(onClick = { scanning = true }) { Text("Scan") }
+                    }
                     TextButton(onClick = { showAddPublisher = true }) { Text("+ Publisher") }
                     TextButton(onClick = { sizeMenuOpen = true }) { Text("Size") }
                     DropdownMenu(expanded = sizeMenuOpen, onDismissRequest = { sizeMenuOpen = false }) {
@@ -71,6 +90,7 @@ fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit) {
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             when (val comics = state.comics) {
@@ -94,8 +114,12 @@ fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit) {
                         LazyColumn(Modifier.fillMaxSize().weight(1f)) {
                             items(comics.value, key = { it.id.value }) { comic ->
                                 val checked = comic.id in state.checkedComicIds
+                                val skipped = comic.id in state.skippedComicIds
                                 Row(
-                                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .alpha(if (skipped) 0.4f else 1f)
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
@@ -108,10 +132,31 @@ fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit) {
                                         Text(comic.displayTitle, style = MaterialTheme.typography.titleSmall)
                                         Text(comic.publisher.name, style = MaterialTheme.typography.labelMedium)
                                     }
-                                    Checkbox(
-                                        checked = checked,
-                                        onCheckedChange = { viewModel.toggleCheck(comic.id) },
-                                    )
+                                    if (!checked) {
+                                        TextButton(
+                                            onClick = {
+                                                val id: ComicId = comic.id
+                                                viewModel.toggleSkip(id)
+                                                if (!skipped) {
+                                                    scope.launch {
+                                                        val result = snackbar.showSnackbar(
+                                                            message = "Skipped \"${comic.displayTitle}\"",
+                                                            actionLabel = "Undo",
+                                                        )
+                                                        if (result == SnackbarResult.ActionPerformed) {
+                                                            viewModel.toggleSkip(id)
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                        ) { Text(if (skipped) "Undo" else "Skip") }
+                                    }
+                                    if (!skipped) {
+                                        Checkbox(
+                                            checked = checked,
+                                            onCheckedChange = { viewModel.toggleCheck(comic.id) },
+                                        )
+                                    }
                                 }
                                 HorizontalDivider()
                             }
@@ -153,6 +198,20 @@ fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit) {
             onAdd = { viewModel.addPublisher(it) },
             onRemove = { viewModel.remove(it) },
             onDismiss = { showAddPublisher = false },
+        )
+    }
+
+    if (scanning) {
+        platform.scanner?.Content(
+            onDetected = { mainCode, _ ->
+                val found = viewModel.checkOffByUpc(mainCode)
+                if (found) {
+                    scope.launch { snackbar.showSnackbar("Checked off!") }
+                    scanning = false
+                }
+                found
+            },
+            onClose = { scanning = false },
         )
     }
 }

@@ -31,9 +31,10 @@ data class PullListUiState(
     /** Comics for [week] that match at least one pull list entry. */
     val comics: Loadable<List<Comic>> = Loadable.Loading,
     val checkedComicIds: Set<ComicId> = emptySet(),
+    val skippedComicIds: Set<ComicId> = emptySet(),
 ) {
     /** True when comics have been loaded and at least one matched the pull list. */
-    val hasComics: Boolean get() = comics is Loadable.Ready && (comics as Loadable.Ready).value.isNotEmpty()
+    val hasComics: Boolean get() = (comics as? Loadable.Ready)?.value?.isNotEmpty() == true
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -51,6 +52,10 @@ class PullListViewModel(
         .flatMapLatest { w -> pullList.observeWeekChecks(w.start) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
+    private val skippedIds: StateFlow<Set<ComicId>> = week
+        .flatMapLatest { w -> pullList.observeWeekSkips(w.start) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
     private val knownPublishers: StateFlow<List<String>> = collection.observeEntries()
         .map { entries ->
             val fromCollection = entries.mapNotNull { it.comic?.publisher?.name }
@@ -59,13 +64,9 @@ class PullListViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FOLLOWED_PUBLISHERS.sorted())
 
     val state: StateFlow<PullListUiState> = combine(
-        pullList.observe(),
-        week,
-        loadedComics,
-        checkedIds,
-        knownPublishers,
-    ) { entries, currentWeek, comics, checked, publishers ->
-        // Filter loaded comics to only those matched by a pull list entry
+        combine(pullList.observe(), week, loadedComics) { entries, w, comics -> Triple(entries, w, comics) },
+        combine(checkedIds, skippedIds, knownPublishers) { checked, skipped, publishers -> Triple(checked, skipped, publishers) },
+    ) { (entries, currentWeek, comics), (checked, skipped, publishers) ->
         val filtered = when (comics) {
             is Loadable.Ready -> Loadable.Ready(comics.value.filter { comic -> entries.any { it.matches(comic) } })
             else -> comics
@@ -76,11 +77,11 @@ class PullListViewModel(
             week = currentWeek,
             comics = filtered,
             checkedComicIds = checked,
+            skippedComicIds = skipped,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PullListUiState(week = week.value))
 
     init {
-        // Load comics whenever the week changes
         viewModelScope.launch {
             week.collect { w -> loadWeek(w) }
         }
@@ -105,11 +106,23 @@ class PullListViewModel(
         viewModelScope.launch { pullList.toggleCheck(week.value.start, comicId) }
     }
 
+    fun toggleSkip(comicId: ComicId) {
+        viewModelScope.launch { pullList.toggleSkip(week.value.start, comicId) }
+    }
+
+    /** Called when a barcode is scanned from the pull list screen. Checks off the matching comic if found. */
+    fun checkOffByUpc(mainCode: String): Boolean {
+        val comics = (loadedComics.value as? Loadable.Ready)?.value ?: return false
+        val comic = comics.firstOrNull { it.upc == mainCode } ?: return false
+        viewModelScope.launch { pullList.toggleCheck(week.value.start, comic.id) }
+        return true
+    }
+
     private fun loadWeek(w: ReleaseWeek) {
         loadedComics.value = Loadable.Loading
         viewModelScope.launch {
             val result = getWeeklyReleases(w, publishers = emptySet())
-            if (week.value != w) return@launch // week changed while loading
+            if (week.value != w) return@launch
             loadedComics.value = when (result) {
                 is com.guturner.longbox.domain.model.Outcome.Success -> Loadable.Ready(result.value)
                 is com.guturner.longbox.domain.model.Outcome.Failure -> Loadable.Failed(result.error.toUiMessage())

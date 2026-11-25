@@ -19,11 +19,18 @@ interface PullListRepository {
     suspend fun isOnPullList(comic: Comic): Boolean
 
     /**
-     * Emits the set of comic IDs the user has checked off for the week starting on [weekStart].
-     * Resets automatically as [weekStart] advances — callers simply pass the current week's start.
+     * Emits the set of comic IDs the user has checked off (picked up) for the week starting on [weekStart].
      */
     fun observeWeekChecks(weekStart: CalendarDate): Flow<Set<ComicId>>
 
     /** Adds [comicId] to the week's check set, or removes it if already present. */
     suspend fun toggleCheck(weekStart: CalendarDate, comicId: ComicId)
+
+    /**
+     * Emits the set of comic IDs the user has explicitly skipped (not buying) for the week.
+     */
+    fun observeWeekSkips(weekStart: CalendarDate): Flow<Set<ComicId>>
+
+    /** Adds [comicId] to the week's skip set, or removes it if already present (undo). */
+    suspend fun toggleSkip(weekStart: CalendarDate, comicId: ComicId)
 }
