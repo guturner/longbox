@@ -1,12 +1,15 @@
 package com.guturner.longbox.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,6 +21,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.guturner.longbox.ui.LocalPlatform
+import longbox.shared.ui.generated.resources.Res
+import longbox.shared.ui.generated.resources.longbox_logo
+import org.jetbrains.compose.resources.painterResource
 
 /** Comic covers are close to 2:3 (6.625" x 10.25" trim). */
 const val COVER_ASPECT = 0.66f
@@ -64,6 +70,18 @@ fun PendingCover(label: String, modifier: Modifier = Modifier) {
 fun CenteredMessage(text: String, modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Text(text, textAlign = TextAlign.Center)
+    }
+}
+
+/** App logo as a tappable home button — clicking navigates back to the library root. */
+@Composable
+fun HomeIconButton(onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Image(
+            painter = painterResource(Res.drawable.longbox_logo),
+            contentDescription = "Home",
+            modifier = Modifier.size(32.dp),
+        )
     }
 }
 

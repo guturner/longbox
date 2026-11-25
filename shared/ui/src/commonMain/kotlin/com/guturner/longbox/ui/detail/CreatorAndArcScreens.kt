@@ -14,7 +14,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,13 +25,14 @@ import com.guturner.longbox.presentation.Loadable
 import com.guturner.longbox.presentation.StoryArcViewModel
 import com.guturner.longbox.ui.components.CenteredMessage
 import com.guturner.longbox.ui.components.CoverImage
+import com.guturner.longbox.ui.components.HomeIconButton
 import com.guturner.longbox.ui.components.MetronAttribution
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreatorScreen(
     viewModel: CreatorViewModel,
-    onBack: () -> Unit,
+    onGoHome: () -> Unit,
     onShowAsWriter: () -> Unit,
     onShowAsArtist: () -> Unit,
 ) {
@@ -41,7 +41,7 @@ fun CreatorScreen(
         topBar = {
             TopAppBar(
                 title = { Text((creator as? Loadable.Ready)?.value?.name ?: "Creator") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
+                navigationIcon = { HomeIconButton(onGoHome) },
             )
         },
     ) { padding ->
@@ -75,7 +75,7 @@ fun CreatorScreen(
 @Composable
 fun StoryArcScreen(
     viewModel: StoryArcViewModel,
-    onBack: () -> Unit,
+    onGoHome: () -> Unit,
     onShowInLibrary: () -> Unit,
 ) {
     val arc by viewModel.arc.collectAsStateWithLifecycle()
@@ -83,7 +83,7 @@ fun StoryArcScreen(
         topBar = {
             TopAppBar(
                 title = { Text((arc as? Loadable.Ready)?.value?.name ?: "Event") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
+                navigationIcon = { HomeIconButton(onGoHome) },
             )
         },
     ) { padding ->

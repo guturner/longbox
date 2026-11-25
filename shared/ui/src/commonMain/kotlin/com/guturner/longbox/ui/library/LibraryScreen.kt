@@ -46,6 +46,7 @@ import com.guturner.longbox.domain.model.LookupStatus
 import com.guturner.longbox.presentation.LibraryViewModel
 import com.guturner.longbox.ui.components.CenteredMessage
 import com.guturner.longbox.ui.components.CoverImage
+import com.guturner.longbox.ui.components.HomeIconButton
 import com.guturner.longbox.ui.components.MetronAttribution
 import com.guturner.longbox.ui.components.PendingCover
 
@@ -75,8 +76,9 @@ fun LibraryScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Longbox · ${state.totalInCollection}") },
+                navigationIcon = { HomeIconButton(onClick = {}) },
                 actions = {
-                    TextButton(onClick = onOpenReleases) { Text("This week") }
+                    TextButton(onClick = onOpenReleases) { Text("New Releases") }
                     TextButton(onClick = { menuOpen = true }) { Text("More") }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(text = { Text("Add or check by UPC") }, onClick = { menuOpen = false; onAddManually() })

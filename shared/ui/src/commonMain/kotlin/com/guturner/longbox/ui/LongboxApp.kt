@@ -59,6 +59,7 @@ fun LongboxApp(graph: AppGraph, platform: PlatformServices) {
 @Composable
 private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: () -> Unit) {
     val nav = rememberNavController()
+    val goHome: () -> Unit = { nav.popBackStack(LibraryRoute, inclusive = false) }
     // Activity/window-scoped so filters survive navigating into details and back.
     val library = viewModel {
         LibraryViewModel(graph.observeLibrary, graph.refreshCollection, graph.removeFromCollection, graph.sync)
@@ -83,7 +84,7 @@ private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: 
             val vm = viewModel(key = "comic-${id.value}") { ComicDetailViewModel(id, graph.getComic, graph.collectionRepository) }
             ComicDetailScreen(
                 viewModel = vm,
-                onBack = { nav.popBackStack() },
+                onGoHome = goHome,
                 onOpenCreator = { nav.navigate(CreatorRoute(it.value)) },
                 onOpenStoryArc = { nav.navigate(StoryArcRoute(it.id.value)) },
                 onRemoveCopy = library::remove,
@@ -94,9 +95,9 @@ private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: 
             val vm = viewModel(key = "creator-${id.value}") { CreatorViewModel(id, graph.getCreator) }
             CreatorScreen(
                 viewModel = vm,
-                onBack = { nav.popBackStack() },
-                onShowAsWriter = { library.showOnly(LibraryFilter(writerIds = setOf(id))); nav.popBackStack(LibraryRoute, inclusive = false) },
-                onShowAsArtist = { library.showOnly(LibraryFilter(artistIds = setOf(id))); nav.popBackStack(LibraryRoute, inclusive = false) },
+                onGoHome = goHome,
+                onShowAsWriter = { library.showOnly(LibraryFilter(writerIds = setOf(id))); goHome() },
+                onShowAsArtist = { library.showOnly(LibraryFilter(artistIds = setOf(id))); goHome() },
             )
         }
         composable<StoryArcRoute> { entry ->
@@ -104,13 +105,13 @@ private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: 
             val vm = viewModel(key = "arc-${id.value}") { StoryArcViewModel(id, graph.getStoryArc) }
             StoryArcScreen(
                 viewModel = vm,
-                onBack = { nav.popBackStack() },
-                onShowInLibrary = { library.showOnly(LibraryFilter(storyArcIds = setOf(id))); nav.popBackStack(LibraryRoute, inclusive = false) },
+                onGoHome = goHome,
+                onShowInLibrary = { library.showOnly(LibraryFilter(storyArcIds = setOf(id))); goHome() },
             )
         }
         composable<ReleasesRoute> {
             val vm = viewModel { ReleasesViewModel(graph.getWeeklyReleases, graph.collectionRepository, graph.clock) }
-            ReleasesScreen(vm, onBack = { nav.popBackStack() })
+            ReleasesScreen(vm, onGoHome = goHome)
         }
         composable<ScanRoute> { entry ->
             val scanner = platform.scanner ?: return@composable

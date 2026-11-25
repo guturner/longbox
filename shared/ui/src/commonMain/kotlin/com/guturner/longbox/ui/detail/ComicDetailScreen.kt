@@ -37,13 +37,14 @@ import com.guturner.longbox.presentation.ComicDetailViewModel
 import com.guturner.longbox.presentation.Loadable
 import com.guturner.longbox.ui.components.CenteredMessage
 import com.guturner.longbox.ui.components.CoverImage
+import com.guturner.longbox.ui.components.HomeIconButton
 import com.guturner.longbox.ui.components.MetronAttribution
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ComicDetailScreen(
     viewModel: ComicDetailViewModel,
-    onBack: () -> Unit,
+    onGoHome: () -> Unit,
     onOpenCreator: (CreatorId) -> Unit,
     onOpenStoryArc: (StoryArcRef) -> Unit,
     onRemoveCopy: (EntryId) -> Unit,
@@ -55,7 +56,7 @@ fun ComicDetailScreen(
         topBar = {
             TopAppBar(
                 title = { Text((comic as? Loadable.Ready)?.value?.displayTitle ?: "") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
+                navigationIcon = { HomeIconButton(onGoHome) },
             )
         },
     ) { padding ->
