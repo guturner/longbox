@@ -76,6 +76,8 @@ data class ReleasesUiState(
     val enabledPublishers: Set<String> = FOLLOWED_PUBLISHERS,
     /** All publisher names seen in the unfiltered week data, for rendering checkboxes. */
     val availablePublishers: List<String> = emptyList(),
+    /** Raw unfiltered list from the catalog — kept so toggling publishers can show/hide without a network round-trip. */
+    val allComics: List<Comic> = emptyList(),
 )
 
 class ReleasesViewModel(
@@ -99,39 +101,33 @@ class ReleasesViewModel(
     fun nextWeek() = load(mutableState.value.week.next())
 
     fun togglePublisher(name: String) {
-        val current = mutableState.value.enabledPublishers
-        val next = if (name in current) current - name else current + name
-        mutableState.value = mutableState.value.copy(
+        val current = mutableState.value
+        val next = if (name in current.enabledPublishers) current.enabledPublishers - name else current.enabledPublishers + name
+        mutableState.value = current.copy(
             enabledPublishers = next,
-            comics = applyFilter(mutableState.value.comics, next),
+            comics = Loadable.Ready(applyFilter(current.allComics, next)),
         )
     }
 
     private fun load(week: ReleaseWeek) {
-        mutableState.value = mutableState.value.copy(week = week, comics = Loadable.Loading)
+        mutableState.value = mutableState.value.copy(week = week, comics = Loadable.Loading, allComics = emptyList())
         viewModelScope.launch {
-            // Fetch unfiltered so we can populate the publisher list
+            // Fetch unfiltered so we can populate the publisher list and re-filter client-side
             val result = getWeeklyReleases(week, publishers = emptySet())
             if (mutableState.value.week != week) return@launch
             val enabled = mutableState.value.enabledPublishers
             mutableState.value = mutableState.value.copy(
+                allComics = (result as? Outcome.Success)?.value ?: emptyList(),
                 availablePublishers = (result as? Outcome.Success)
                     ?.value?.map { it.publisher.name }?.distinct()?.sorted() ?: emptyList(),
                 comics = when (result) {
-                    is Outcome.Success -> Loadable.Ready(
-                        result.value.filter { enabled.isEmpty() || it.publisher.name in enabled }
-                    )
+                    is Outcome.Success -> Loadable.Ready(applyFilter(result.value, enabled))
                     is Outcome.Failure -> Loadable.Failed(result.error.toUiMessage())
                 },
             )
         }
     }
 
-    private fun applyFilter(comics: Loadable<List<Comic>>, enabled: Set<String>): Loadable<List<Comic>> =
-        when (comics) {
-            is Loadable.Ready -> Loadable.Ready(
-                comics.value.filter { enabled.isEmpty() || it.publisher.name in enabled }
-            )
-            else -> comics
-        }
+    private fun applyFilter(comics: List<Comic>, enabled: Set<String>): List<Comic> =
+        comics.filter { enabled.isEmpty() || it.publisher.name in enabled }
 }
