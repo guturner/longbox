@@ -9,6 +9,7 @@ import com.guturner.longbox.domain.model.Outcome
 import com.guturner.longbox.domain.repository.Clock
 import com.guturner.longbox.domain.repository.CollectionRepository
 import com.guturner.longbox.domain.repository.SessionRepository
+import com.guturner.longbox.domain.usecase.FOLLOWED_PUBLISHERS
 import com.guturner.longbox.domain.usecase.GetWeeklyReleasesUseCase
 import com.guturner.longbox.domain.usecase.ReleaseWeek
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,6 +72,10 @@ class SessionViewModel(
 data class ReleasesUiState(
     val week: ReleaseWeek,
     val comics: Loadable<List<Comic>> = Loadable.Loading,
+    /** Publishers currently checked; empty = show all. Defaults to the well-known set. */
+    val enabledPublishers: Set<String> = FOLLOWED_PUBLISHERS,
+    /** All publisher names seen in the unfiltered week data, for rendering checkboxes. */
+    val availablePublishers: List<String> = emptyList(),
 )
 
 class ReleasesViewModel(
@@ -93,17 +98,40 @@ class ReleasesViewModel(
     fun previousWeek() = load(mutableState.value.week.previous())
     fun nextWeek() = load(mutableState.value.week.next())
 
+    fun togglePublisher(name: String) {
+        val current = mutableState.value.enabledPublishers
+        val next = if (name in current) current - name else current + name
+        mutableState.value = mutableState.value.copy(
+            enabledPublishers = next,
+            comics = applyFilter(mutableState.value.comics, next),
+        )
+    }
+
     private fun load(week: ReleaseWeek) {
         mutableState.value = mutableState.value.copy(week = week, comics = Loadable.Loading)
         viewModelScope.launch {
-            val result = getWeeklyReleases(week)
-            if (mutableState.value.week != week) return@launch // user paged away meanwhile
+            // Fetch unfiltered so we can populate the publisher list
+            val result = getWeeklyReleases(week, publishers = emptySet())
+            if (mutableState.value.week != week) return@launch
+            val enabled = mutableState.value.enabledPublishers
             mutableState.value = mutableState.value.copy(
+                availablePublishers = (result as? Outcome.Success)
+                    ?.value?.map { it.publisher.name }?.distinct()?.sorted() ?: emptyList(),
                 comics = when (result) {
-                    is Outcome.Success -> Loadable.Ready(result.value)
+                    is Outcome.Success -> Loadable.Ready(
+                        result.value.filter { enabled.isEmpty() || it.publisher.name in enabled }
+                    )
                     is Outcome.Failure -> Loadable.Failed(result.error.toUiMessage())
                 },
             )
         }
     }
+
+    private fun applyFilter(comics: Loadable<List<Comic>>, enabled: Set<String>): Loadable<List<Comic>> =
+        when (comics) {
+            is Loadable.Ready -> Loadable.Ready(
+                comics.value.filter { enabled.isEmpty() || it.publisher.name in enabled }
+            )
+            else -> comics
+        }
 }
