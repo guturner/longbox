@@ -62,8 +62,9 @@ android {
     )
 }
 
-// Ensure the resource assembly runs before assets are merged.
-tasks.matching { it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets" }.configureEach {
+// Ensure the resource assembly runs before any Android task that reads the assets source set
+// (merge assets, lint model generation, lint analysis, etc.).
+tasks.named("preBuild") {
     dependsOn(":shared:ui:assembleAndroidMainComposeResources")
 }
 
