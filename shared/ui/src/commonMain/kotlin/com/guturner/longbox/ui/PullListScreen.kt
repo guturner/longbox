@@ -1,8 +1,8 @@
 package com.guturner.longbox.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +15,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -125,32 +126,41 @@ private fun AddPublisherDialog(
     onDismiss: () -> Unit,
 ) {
     var search by remember { mutableStateOf("") }
+    val available = knownPublishers.filter { it !in existingPublishers }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add publisher") },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
         text = {
             Column {
+                // Quick-pick chips for known publishers
+                if (available.isNotEmpty()) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        available.forEach { name ->
+                            SuggestionChip(
+                                onClick = { onAdd(name) },
+                                label = { Text(name) },
+                            )
+                        }
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                }
+                // Escape hatch for publishers not in the chip list
                 OutlinedTextField(
                     value = search,
                     onValueChange = { search = it },
                     singleLine = true,
-                    placeholder = { Text("Search or type publisher name") },
+                    placeholder = { Text("Add a different publisher") },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                val candidates = knownPublishers
-                    .filter { it.contains(search, ignoreCase = true) && it !in existingPublishers }
-                    .take(8)
                 if (search.isNotBlank() && search !in knownPublishers && search !in existingPublishers) {
-                    // Allow adding a custom publisher name not in the library
                     TextButton(onClick = { onAdd(search.trim()) }, modifier = Modifier.fillMaxWidth()) {
                         Text("Add \"${search.trim()}\"")
                     }
-                }
-                candidates.forEach { name ->
-                    Row(
-                        Modifier.fillMaxWidth().clickable { onAdd(name) }.padding(vertical = 8.dp),
-                    ) { Text(name) }
                 }
             }
         },

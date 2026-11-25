@@ -52,6 +52,10 @@ import com.guturner.longbox.ui.components.PendingCover
 
 private enum class FacetKind(val label: String) { SERIES("Title"), WRITER("Writer"), ARTIST("Artist"), EVENT("Event"), PUBLISHER("Publisher") }
 
+private enum class CoverSize(val minDp: Int, val label: String) {
+    SMALL(132, "Small"), MEDIUM(160, "Medium"), LARGE(200, "Large")
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
@@ -68,6 +72,7 @@ fun LibraryScreen(
     val snackbar = remember { SnackbarHostState() }
     var openFacet by remember { mutableStateOf<FacetKind?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
+    var coverSize by remember { mutableStateOf(CoverSize.MEDIUM) }
 
     LaunchedEffect(state.message) {
         state.message?.let { snackbar.showSnackbar(it.text); viewModel.dismissMessage() }
@@ -89,6 +94,14 @@ fun LibraryScreen(
                         }
                         DropdownMenuItem(text = { Text("Refresh") }, onClick = { menuOpen = false; viewModel.refresh() })
                         DropdownMenuItem(text = { Text("Sign out") }, onClick = { menuOpen = false; onSignOut() })
+                        androidx.compose.material3.HorizontalDivider()
+                        CoverSize.entries.forEach { size ->
+                            DropdownMenuItem(
+                                text = { Text("Covers: ${size.label}") },
+                                trailingIcon = if (coverSize == size) { { Text("✓") } } else null,
+                                onClick = { menuOpen = false; coverSize = size },
+                            )
+                        }
                     }
                 },
             )
@@ -125,7 +138,8 @@ fun LibraryScreen(
                 Text(
                     banner,
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = if (state.sync.serverReachable) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
                 )
             }
@@ -146,7 +160,7 @@ fun LibraryScreen(
                 )
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 132.dp),
+                    columns = GridCells.Adaptive(minSize = coverSize.minDp.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -226,12 +240,14 @@ private fun LibraryTile(entry: CollectionEntry, onClick: () -> Unit) {
             Text(
                 comic?.let { "#${it.number.raw}" } ?: "—",
                 style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             entry.ownedCoverName?.let { Badge { Text("Variant") } }
         }
         Text(
             comic?.series?.displayName ?: "Unknown",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )

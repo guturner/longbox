@@ -41,11 +41,13 @@ data class LibraryUiState(
     val message: UiMessage? = null,
     val sync: SyncState = SyncState(serverReachable = false, pendingChanges = 0, lastSyncedAtEpochMillis = null),
 ) {
-    /** "Offline · 3 changes waiting · library from Nov 21" style banner text, or null when all is synced. */
+    /** Banner shown below the filter row; null when everything is synced and reachable. */
     val syncBanner: String?
         get() = when {
-            !sync.serverReachable && sync.pendingChanges > 0 -> "Away from home · ${sync.pendingChanges} change(s) will sync when you're back"
-            !sync.serverReachable -> "Away from home · showing your cached library"
+            !sync.serverReachable && sync.pendingChanges > 0 ->
+                "Can't reach server · ${sync.pendingChanges} change(s) queued · open Tailscale to sync"
+            !sync.serverReachable ->
+                "Can't reach server · showing cached library · open Tailscale to connect"
             sync.pendingChanges > 0 -> "Syncing ${sync.pendingChanges} change(s)…"
             else -> null
         }

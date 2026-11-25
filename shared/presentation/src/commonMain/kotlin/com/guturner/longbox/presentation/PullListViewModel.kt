@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.guturner.longbox.domain.model.PullListEntry
 import com.guturner.longbox.domain.repository.CollectionRepository
 import com.guturner.longbox.domain.repository.PullListRepository
+import com.guturner.longbox.domain.usecase.FOLLOWED_PUBLISHERS
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -28,12 +29,13 @@ class PullListViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PullListUiState())
 
-    /** Publishers seen in the user's library, for the add-publisher picker. */
+    /** FOLLOWED_PUBLISHERS plus any publishers seen in the user's library, for the picker. */
     val knownPublishers: StateFlow<List<String>> = collection.observeEntries()
         .map { entries ->
-            entries.mapNotNull { it.comic?.publisher?.name }.distinct().sorted()
+            val fromCollection = entries.mapNotNull { it.comic?.publisher?.name }
+            (FOLLOWED_PUBLISHERS + fromCollection).distinct().sorted()
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FOLLOWED_PUBLISHERS.sorted())
 
     fun addPublisher(name: String) {
         viewModelScope.launch { pullList.add(PullListEntry.ByPublisher(name)) }
