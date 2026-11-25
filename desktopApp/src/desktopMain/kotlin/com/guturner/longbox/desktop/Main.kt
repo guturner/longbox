@@ -33,6 +33,7 @@ import io.ktor.client.engine.okhttp.OkHttp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.withContext
 import java.awt.Desktop
 import java.io.File
@@ -66,13 +67,19 @@ fun main() {
         // Auto-open settings on first run (URL is still the default placeholder).
         var showSettings by remember { mutableStateOf(initialConfig.serverUrl == DEFAULT_SERVER_URL) }
 
+        // Cancel the previous AppGraph's scope when the URL changes so its background
+        // coroutines don't outlive the graph instance.
+        val prevScope = remember { arrayOf<CoroutineScope?>(null) }
         val graph = remember(serverUrl) {
+            prevScope[0]?.cancel()
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            prevScope[0] = scope
             AppGraph(
                 engine = OkHttp.create(),
                 baseUrl = serverUrl,
                 transport = SessionTransport.Bearer(WindowsCredentialTokenStore()),
                 localStore = FileKeyValueStore(appDir),
-                appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+                appScope = scope,
                 clock = Clock { LocalDate.now().let { CalendarDate(it.year, it.monthValue, it.dayOfMonth) } },
                 nowMillis = System::currentTimeMillis,
             )
