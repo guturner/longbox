@@ -208,6 +208,8 @@ fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit) {
                 if (found) {
                     scope.launch { snackbar.showSnackbar("Checked off!") }
                     scanning = false
+                } else {
+                    scope.launch { snackbar.showSnackbar("Not on your pull list this week") }
                 }
                 found
             },
