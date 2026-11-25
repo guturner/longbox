@@ -7,9 +7,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -29,116 +33,171 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.guturner.longbox.domain.model.PullListEntry
+import com.guturner.longbox.presentation.Loadable
 import com.guturner.longbox.presentation.PullListViewModel
 import com.guturner.longbox.ui.components.CenteredMessage
+import com.guturner.longbox.ui.components.CoverImage
+import com.guturner.longbox.ui.components.CoverSize
 import com.guturner.longbox.ui.components.HomeIconButton
+import com.guturner.longbox.ui.components.MetronAttribution
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val knownPublishers by viewModel.knownPublishers.collectAsStateWithLifecycle()
     var showAddPublisher by remember { mutableStateOf(false) }
+    var coverSize by remember { mutableStateOf(CoverSize.MEDIUM) }
+    var sizeMenuOpen by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Pull List") },
+                title = { Text("Pull List · ${state.week.wednesday}") },
                 navigationIcon = { HomeIconButton(onGoHome) },
                 actions = {
+                    TextButton(onClick = viewModel::previousWeek) { Text("‹ Prev") }
+                    TextButton(onClick = viewModel::nextWeek) { Text("Next ›") }
                     TextButton(onClick = { showAddPublisher = true }) { Text("+ Publisher") }
+                    TextButton(onClick = { sizeMenuOpen = true }) { Text("Size") }
+                    DropdownMenu(expanded = sizeMenuOpen, onDismissRequest = { sizeMenuOpen = false }) {
+                        CoverSize.entries.forEach { size ->
+                            DropdownMenuItem(
+                                text = { Text("Covers: ${size.label}") },
+                                trailingIcon = if (coverSize == size) { { Text("✓") } } else null,
+                                onClick = { sizeMenuOpen = false; coverSize = size },
+                            )
+                        }
+                    }
                 },
             )
         },
     ) { padding ->
-        if (state.entries.isEmpty()) {
-            CenteredMessage(
-                "Your pull list is empty.\nAdd publishers or series you plan to buy each week.",
-                Modifier.padding(padding),
-            )
-        } else {
-            LazyColumn(Modifier.fillMaxSize().padding(padding)) {
-                // Group by type for a cleaner layout
-                val publishers = state.entries.filterIsInstance<PullListEntry.ByPublisher>()
-                val series = state.entries.filterIsInstance<PullListEntry.BySeries>()
-
-                if (publishers.isNotEmpty()) {
-                    item {
-                        Text(
-                            "Publishers",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            when (val comics = state.comics) {
+                Loadable.Loading -> CenteredMessage("Loading…", Modifier.weight(1f))
+                is Loadable.Failed -> CenteredMessage(
+                    "${comics.message.text}\nNew releases need the home server.",
+                    Modifier.weight(1f),
+                )
+                is Loadable.Ready -> {
+                    if (comics.value.isEmpty() && state.entries.isEmpty()) {
+                        CenteredMessage(
+                            "Your pull list is empty.\nAdd publishers or series you plan to buy each week.",
+                            Modifier.weight(1f),
                         )
-                    }
-                    items(publishers, key = { it.publisherName }) { entry ->
-                        PullListRow(entry.displayName, onRemove = { viewModel.remove(entry) })
-                        HorizontalDivider()
-                    }
-                }
-
-                if (series.isNotEmpty()) {
-                    item {
-                        Text(
-                            "Series",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    } else if (comics.value.isEmpty()) {
+                        CenteredMessage(
+                            "No releases this week for your pull list publishers.",
+                            Modifier.weight(1f),
                         )
-                    }
-                    items(series, key = { it.seriesId.value }) { entry ->
-                        PullListRow(entry.displayName, onRemove = { viewModel.remove(entry) })
-                        HorizontalDivider()
+                    } else {
+                        LazyColumn(Modifier.fillMaxSize().weight(1f)) {
+                            items(comics.value, key = { it.id.value }) { comic ->
+                                val checked = comic.id in state.checkedComicIds
+                                Row(
+                                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    CoverImage(
+                                        comic.coverA.imageUrl,
+                                        comic.displayTitle,
+                                        Modifier.width(coverSize.listWidthDp.dp),
+                                    )
+                                    Column(Modifier.weight(1f)) {
+                                        Text(comic.displayTitle, style = MaterialTheme.typography.titleSmall)
+                                        Text(comic.publisher.name, style = MaterialTheme.typography.labelMedium)
+                                    }
+                                    Checkbox(
+                                        checked = checked,
+                                        onCheckedChange = { viewModel.toggleCheck(comic.id) },
+                                    )
+                                }
+                                HorizontalDivider()
+                            }
+                        }
                     }
                 }
             }
+
+            // Pull list entries summary at the bottom
+            if (state.entries.isNotEmpty()) {
+                val publishers = state.entries.filterIsInstance<PullListEntry.ByPublisher>()
+                val series = state.entries.filterIsInstance<PullListEntry.BySeries>()
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        buildString {
+                            if (publishers.isNotEmpty()) append("${publishers.size} publisher(s)")
+                            if (publishers.isNotEmpty() && series.isNotEmpty()) append(" · ")
+                            if (series.isNotEmpty()) append("${series.size} series")
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    )
+                    TextButton(onClick = { showAddPublisher = true }) { Text("Edit") }
+                }
+            }
+
+            MetronAttribution(Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
         }
     }
 
     if (showAddPublisher) {
-        AddPublisherDialog(
-            knownPublishers = knownPublishers,
-            existingPublishers = state.entries.filterIsInstance<PullListEntry.ByPublisher>()
-                .map { it.publisherName }.toSet(),
-            onAdd = { viewModel.addPublisher(it); showAddPublisher = false },
+        ManagePullListDialog(
+            entries = state.entries,
+            knownPublishers = state.knownPublishers,
+            onAdd = { viewModel.addPublisher(it) },
+            onRemove = { viewModel.remove(it) },
             onDismiss = { showAddPublisher = false },
         )
     }
 }
 
 @Composable
-private fun PullListRow(label: String, onRemove: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        TextButton(onClick = onRemove) { Text("Remove") }
-    }
-}
-
-@Composable
-private fun AddPublisherDialog(
+private fun ManagePullListDialog(
+    entries: List<PullListEntry>,
     knownPublishers: List<String>,
-    existingPublishers: Set<String>,
     onAdd: (String) -> Unit,
+    onRemove: (PullListEntry) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var search by remember { mutableStateOf("") }
+    val existingPublishers = entries.filterIsInstance<PullListEntry.ByPublisher>().map { it.publisherName }.toSet()
     val available = knownPublishers.filter { it !in existingPublishers }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add publisher") },
+        title = { Text("Pull list publishers") },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
         text = {
             Column {
-                // Quick-pick chips for known publishers
+                // Current entries with remove buttons
+                val publishers = entries.filterIsInstance<PullListEntry.ByPublisher>()
+                if (publishers.isNotEmpty()) {
+                    publishers.forEach { entry ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(entry.publisherName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { onRemove(entry) }) { Text("Remove") }
+                        }
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                }
+
+                // Quick-pick chips for publishers not yet on the list
                 if (available.isNotEmpty()) {
+                    Text("Add publisher", style = MaterialTheme.typography.labelMedium)
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     ) {
                         available.forEach { name ->
                             SuggestionChip(
@@ -149,7 +208,8 @@ private fun AddPublisherDialog(
                     }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 }
-                // Escape hatch for publishers not in the chip list
+
+                // Escape hatch for unlisted publishers
                 OutlinedTextField(
                     value = search,
                     onValueChange = { search = it },
@@ -158,7 +218,7 @@ private fun AddPublisherDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (search.isNotBlank() && search !in knownPublishers && search !in existingPublishers) {
-                    TextButton(onClick = { onAdd(search.trim()) }, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(onClick = { onAdd(search.trim()); search = "" }, modifier = Modifier.fillMaxWidth()) {
                         Text("Add \"${search.trim()}\"")
                     }
                 }

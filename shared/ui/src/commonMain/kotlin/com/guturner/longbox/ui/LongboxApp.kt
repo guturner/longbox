@@ -67,7 +67,7 @@ private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: 
     val library = viewModel {
         LibraryViewModel(graph.observeLibrary, graph.refreshCollection, graph.removeFromCollection, graph.sync)
     }
-    val pullListVm = viewModel { PullListViewModel(graph.pullList, graph.collectionRepository) }
+    val pullListVm = viewModel { PullListViewModel(graph.pullList, graph.collectionRepository, graph.getWeeklyReleases, graph.clock) }
     val manualScan = viewModel(key = "manual-scan") { ScanViewModel(graph.scanComic, graph.checkOwnership, graph.nowMillis) }
     var showManualEntry by remember { mutableStateOf(false) }
 

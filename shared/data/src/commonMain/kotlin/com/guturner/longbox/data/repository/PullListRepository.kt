@@ -1,7 +1,9 @@
 package com.guturner.longbox.data.repository
 
 import com.guturner.longbox.data.local.KeyValueStore
+import com.guturner.longbox.domain.model.CalendarDate
 import com.guturner.longbox.domain.model.Comic
+import com.guturner.longbox.domain.model.ComicId
 import com.guturner.longbox.domain.model.PullListEntry
 import com.guturner.longbox.domain.model.SeriesId
 import com.guturner.longbox.domain.model.matches
@@ -10,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
@@ -17,7 +20,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 private val json = Json { ignoreUnknownKeys = true }
-private const val STORE_KEY = "pull-list-v1"
+private const val LIST_KEY = "pull-list-v1"
+private const val CHECKS_KEY = "pull-list-checks-v1"
+
+// ── pull list entries ─────────────────────────────────────────────────────────
 
 @Serializable
 private data class StoredPullList(val entries: List<StoredEntry> = emptyList())
@@ -38,42 +44,70 @@ private fun StoredEntry.toDomain(): PullListEntry = when (this) {
     is StoredEntry.Series -> PullListEntry.BySeries(SeriesId(id), name, publisherName)
 }
 
+// ── weekly check state ────────────────────────────────────────────────────────
+
+/** Map of ISO week-start string (e.g. "2026-11-23") → set of checked comic ID longs. */
+@Serializable
+private data class StoredChecks(val weeks: Map<String, List<Long>> = emptyMap())
+
 class KeyValueStorePullListRepository(
     private val store: KeyValueStore,
     appScope: CoroutineScope,
 ) : PullListRepository {
 
     private val state = MutableStateFlow<List<PullListEntry>>(emptyList())
+    // weekStart.toString() → Set<ComicId>
+    private val checks = MutableStateFlow<Map<String, Set<Long>>>(emptyMap())
 
     init {
         appScope.launch { load() }
     }
 
     private suspend fun load() {
-        val raw = store.read(STORE_KEY) ?: return
-        val stored = runCatching { json.decodeFromString(StoredPullList.serializer(), raw) }.getOrNull() ?: return
-        state.value = stored.entries.map { it.toDomain() }
+        store.read(LIST_KEY)
+            ?.let { runCatching { json.decodeFromString(StoredPullList.serializer(), it) }.getOrNull() }
+            ?.let { state.value = it.entries.map { e -> e.toDomain() } }
+
+        store.read(CHECKS_KEY)
+            ?.let { runCatching { json.decodeFromString(StoredChecks.serializer(), it) }.getOrNull() }
+            ?.let { checks.value = it.weeks.mapValues { (_, ids) -> ids.toSet() } }
     }
 
     override fun observe(): Flow<List<PullListEntry>> = state.asStateFlow()
 
     override suspend fun add(entry: PullListEntry) {
-        state.update { current ->
-            if (current.any { it == entry }) current else current + entry
-        }
-        persist()
+        state.update { current -> if (current.any { it == entry }) current else current + entry }
+        persistList()
     }
 
     override suspend fun remove(entry: PullListEntry) {
         state.update { it.filterNot { e -> e == entry } }
-        persist()
+        persistList()
     }
 
     override suspend fun isOnPullList(comic: Comic): Boolean =
         state.value.any { it.matches(comic) }
 
-    private suspend fun persist() {
+    override fun observeWeekChecks(weekStart: CalendarDate): Flow<Set<ComicId>> =
+        checks.map { map -> map[weekStart.toString()]?.map { ComicId(it) }?.toSet() ?: emptySet() }
+
+    override suspend fun toggleCheck(weekStart: CalendarDate, comicId: ComicId) {
+        val key = weekStart.toString()
+        checks.update { map ->
+            val current = map[key] ?: emptySet()
+            val updated = if (comicId.value in current) current - comicId.value else current + comicId.value
+            map + (key to updated)
+        }
+        persistChecks()
+    }
+
+    private suspend fun persistList() {
         val stored = StoredPullList(state.value.map { it.toStored() })
-        store.write(STORE_KEY, json.encodeToString(StoredPullList.serializer(), stored))
+        store.write(LIST_KEY, json.encodeToString(StoredPullList.serializer(), stored))
+    }
+
+    private suspend fun persistChecks() {
+        val stored = StoredChecks(checks.value.mapValues { (_, ids) -> ids.toList() })
+        store.write(CHECKS_KEY, json.encodeToString(StoredChecks.serializer(), stored))
     }
 }

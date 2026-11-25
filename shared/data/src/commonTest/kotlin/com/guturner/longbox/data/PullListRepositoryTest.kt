@@ -2,6 +2,8 @@ package com.guturner.longbox.data
 
 import com.guturner.longbox.data.local.InMemoryKeyValueStore
 import com.guturner.longbox.data.repository.KeyValueStorePullListRepository
+import com.guturner.longbox.domain.model.CalendarDate
+import com.guturner.longbox.domain.model.ComicId
 import com.guturner.longbox.domain.model.PullListEntry
 import com.guturner.longbox.domain.model.Publisher
 import com.guturner.longbox.domain.model.PublisherId
@@ -103,6 +105,65 @@ class PullListRepositoryTest {
         r.add(batmanEntry)
         val comic = makeBatmanComic()
         assertTrue(r.isOnPullList(comic))
+    }
+
+    // — week check tests —
+
+    private val week1 = CalendarDate(2026, 11, 23)  // Monday
+    private val week2 = CalendarDate(2026, 11, 30)  // Following Monday
+    private val comic1 = ComicId(101)
+    private val comic2 = ComicId(202)
+
+    @Test
+    fun weekChecksStartEmpty() = runTest {
+        val checked = repo().observeWeekChecks(week1).first()
+        assertTrue(checked.isEmpty())
+    }
+
+    @Test
+    fun toggleCheckAddsComicId() = runTest {
+        val r = repo()
+        r.toggleCheck(week1, comic1)
+        val checked = r.observeWeekChecks(week1).first()
+        assertTrue(comic1 in checked)
+    }
+
+    @Test
+    fun toggleCheckRemovesIfAlreadyChecked() = runTest {
+        val r = repo()
+        r.toggleCheck(week1, comic1)
+        r.toggleCheck(week1, comic1)
+        val checked = r.observeWeekChecks(week1).first()
+        assertFalse(comic1 in checked)
+    }
+
+    @Test
+    fun checksAreWeekScoped() = runTest {
+        val r = repo()
+        r.toggleCheck(week1, comic1)
+        val week2Checks = r.observeWeekChecks(week2).first()
+        assertTrue(week2Checks.isEmpty())
+    }
+
+    @Test
+    fun multipleComicsInSameWeek() = runTest {
+        val r = repo()
+        r.toggleCheck(week1, comic1)
+        r.toggleCheck(week1, comic2)
+        val checked = r.observeWeekChecks(week1).first()
+        assertEquals(setOf(comic1, comic2), checked)
+    }
+
+    @Test
+    fun weekChecksPersistAcrossRestart() = runTest {
+        val store = InMemoryKeyValueStore()
+        val r1 = repo(store)
+        r1.toggleCheck(week1, comic1)
+        r1.toggleCheck(week1, comic2)
+
+        val r2 = repo(store)
+        val checked = r2.observeWeekChecks(week1).first()
+        assertEquals(setOf(comic1, comic2), checked)
     }
 
     // — helpers —

@@ -46,15 +46,12 @@ import com.guturner.longbox.domain.model.LookupStatus
 import com.guturner.longbox.presentation.LibraryViewModel
 import com.guturner.longbox.ui.components.CenteredMessage
 import com.guturner.longbox.ui.components.CoverImage
+import com.guturner.longbox.ui.components.CoverSize
 import com.guturner.longbox.ui.components.HomeIconButton
 import com.guturner.longbox.ui.components.MetronAttribution
 import com.guturner.longbox.ui.components.PendingCover
 
 private enum class FacetKind(val label: String) { SERIES("Title"), WRITER("Writer"), ARTIST("Artist"), EVENT("Event"), PUBLISHER("Publisher") }
-
-private enum class CoverSize(val minDp: Int, val label: String) {
-    SMALL(132, "Small"), MEDIUM(160, "Medium"), LARGE(200, "Large")
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -160,7 +157,7 @@ fun LibraryScreen(
                 )
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = coverSize.minDp.dp),
+                    columns = GridCells.Adaptive(minSize = coverSize.gridMinDp.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),

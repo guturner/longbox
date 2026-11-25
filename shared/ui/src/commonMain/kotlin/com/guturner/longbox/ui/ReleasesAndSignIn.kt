@@ -14,6 +14,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -23,7 +25,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -33,6 +38,7 @@ import com.guturner.longbox.presentation.ReleasesViewModel
 import com.guturner.longbox.presentation.SessionViewModel
 import com.guturner.longbox.ui.components.CenteredMessage
 import com.guturner.longbox.ui.components.CoverImage
+import com.guturner.longbox.ui.components.CoverSize
 import com.guturner.longbox.ui.components.HomeIconButton
 import com.guturner.longbox.ui.components.MetronAttribution
 import kotlinx.coroutines.launch
@@ -45,6 +51,8 @@ import org.jetbrains.compose.resources.painterResource
 fun ReleasesScreen(viewModel: ReleasesViewModel, onGoHome: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val owned by viewModel.ownedIds.collectAsStateWithLifecycle()
+    var coverSize by remember { mutableStateOf(CoverSize.MEDIUM) }
+    var sizeMenuOpen by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -54,6 +62,16 @@ fun ReleasesScreen(viewModel: ReleasesViewModel, onGoHome: () -> Unit) {
                 actions = {
                     TextButton(onClick = viewModel::previousWeek) { Text("‹ Prev") }
                     TextButton(onClick = viewModel::nextWeek) { Text("Next ›") }
+                    TextButton(onClick = { sizeMenuOpen = true }) { Text("Size") }
+                    DropdownMenu(expanded = sizeMenuOpen, onDismissRequest = { sizeMenuOpen = false }) {
+                        CoverSize.entries.forEach { size ->
+                            DropdownMenuItem(
+                                text = { Text("Covers: ${size.label}") },
+                                trailingIcon = if (coverSize == size) { { Text("✓") } } else null,
+                                onClick = { sizeMenuOpen = false; coverSize = size },
+                            )
+                        }
+                    }
                 },
             )
         },
@@ -86,7 +104,7 @@ fun ReleasesScreen(viewModel: ReleasesViewModel, onGoHome: () -> Unit) {
                 ) {
                     items(comics.value, key = { it.id.value }) { comic ->
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            CoverImage(comic.coverA.imageUrl, comic.displayTitle, Modifier.width(64.dp))
+                            CoverImage(comic.coverA.imageUrl, comic.displayTitle, Modifier.width(coverSize.listWidthDp.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(comic.displayTitle, style = MaterialTheme.typography.titleSmall)
                                 Text(comic.publisher.name, style = MaterialTheme.typography.labelMedium)

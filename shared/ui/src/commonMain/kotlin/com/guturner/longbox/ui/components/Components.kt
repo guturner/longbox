@@ -28,6 +28,17 @@ import org.jetbrains.compose.resources.painterResource
 /** Comic covers are close to 2:3 (6.625" x 10.25" trim). */
 const val COVER_ASPECT = 0.66f
 
+/**
+ * Cover size preference used by all three main screens.
+ * [gridMinDp] is the adaptive-grid minimum column width; [listWidthDp] is the fixed
+ * image width in list layouts (New Releases, Pull List).
+ */
+internal enum class CoverSize(val gridMinDp: Int, val listWidthDp: Int, val label: String) {
+    SMALL(132, 48, "Small"),
+    MEDIUM(160, 72, "Medium"),
+    LARGE(200, 104, "Large"),
+}
+
 @Composable
 fun CoverImage(url: String?, contentDescription: String, modifier: Modifier = Modifier) {
     val platform = LocalPlatform.current
