@@ -121,6 +121,13 @@ class LibraryViewModel(
         }
     }
 
+    fun removeAllUnresolved() {
+        val unresolved = state.value.entries.filter { it.comic == null }.map { it.id }
+        unresolved.forEach { id ->
+            viewModelScope.launch { removeFromCollection(id) }
+        }
+    }
+
     fun dismissMessage() = transient.update { it.copy(message = null) }
 
     private fun updateFilter(change: (LibraryFilter) -> LibraryFilter) =

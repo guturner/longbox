@@ -91,6 +91,9 @@ internal fun LibraryScreen(
                             DropdownMenuItem(text = { Text("Do I own this? (scan)") }, onClick = { menuOpen = false; check() })
                         }
                         DropdownMenuItem(text = { Text("Refresh") }, onClick = { menuOpen = false; viewModel.refresh() })
+                        if (state.entries.any { it.comic == null }) {
+                            DropdownMenuItem(text = { Text("Remove all unresolved") }, onClick = { menuOpen = false; viewModel.removeAllUnresolved() })
+                        }
                         DropdownMenuItem(text = { Text("Sign out") }, onClick = { menuOpen = false; onSignOut() })
                         androidx.compose.material3.HorizontalDivider()
                         CoverSize.entries.forEach { size ->
@@ -168,7 +171,7 @@ internal fun LibraryScreen(
                         LibraryTile(
                             entry,
                             onClick = { entry.comic?.let { onOpenComic(it.id) } },
-                            onDismiss = if (entry.status == LookupStatus.NOT_FOUND) { { viewModel.remove(entry.id) } } else null,
+                            onDismiss = if (entry.comic == null) { { viewModel.remove(entry.id) } } else null,
                         )
                     }
                 }
