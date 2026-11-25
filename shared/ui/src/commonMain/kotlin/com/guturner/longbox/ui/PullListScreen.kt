@@ -148,6 +148,9 @@ internal fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit, 
                                                             viewModel.toggleSkip(id)
                                                         }
                                                     }
+                                                } else {
+                                                    // Inline Undo: dismiss the pending snackbar to prevent double-toggle
+                                                    snackbar.currentSnackbarData?.dismiss()
                                                 }
                                             },
                                         ) { Text(if (skipped) "Undo" else "Skip") }
