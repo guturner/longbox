@@ -8,17 +8,10 @@ plugins {
 
 val desktopVersion = System.getenv("DESKTOP_VERSION") ?: "0.1.0"
 
-// Generate Version.kt so APP_VERSION in Main.kt always matches the actual release build.
-val generateVersionKt by tasks.registering {
-    val outDir = layout.buildDirectory.dir("generated/kotlin")
-    outputs.dir(outDir)
-    doLast {
-        outDir.get().file("com/guturner/longbox/desktop/Version.kt").asFile.apply {
-            parentFile.mkdirs()
-            writeText("package com.guturner.longbox.desktop\n\ninternal const val APP_VERSION = \"$desktopVersion\"\n")
-        }
-    }
-}
+// Write Version.kt at configuration time — simpler than a task and avoids config-cache issues.
+val versionKtFile = layout.buildDirectory.file("generated/kotlin/com/guturner/longbox/desktop/Version.kt").get().asFile
+versionKtFile.parentFile.mkdirs()
+versionKtFile.writeText("package com.guturner.longbox.desktop\n\ninternal const val APP_VERSION = \"$desktopVersion\"\n")
 
 kotlin {
     jvmToolchain(21)
@@ -26,7 +19,7 @@ kotlin {
 
     sourceSets {
         val desktopMain by getting {
-            kotlin.srcDir(generateVersionKt.map { it.outputs.files.singleFile })
+            kotlin.srcDir(layout.buildDirectory.dir("generated/kotlin"))
             dependencies {
                 implementation(project(":shared:ui"))
                 implementation(compose.desktop.currentOs)
