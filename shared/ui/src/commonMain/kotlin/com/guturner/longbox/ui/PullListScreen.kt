@@ -56,7 +56,7 @@ private val MONTH_ABBR = arrayOf("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug"
 fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit, coverSize: CoverSize, onCoverSizeChange: (CoverSize) -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showAddPublisher by remember { mutableStateOf(false) }
-    var sizeMenuOpen by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val platform = LocalPlatform.current
@@ -76,14 +76,15 @@ fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit, coverSize
                     if (platform.scanner != null) {
                         TextButton(onClick = { scanning = true }) { Text("Scan") }
                     }
-                    TextButton(onClick = { showAddPublisher = true }) { Text("+ Publisher") }
-                    TextButton(onClick = { sizeMenuOpen = true }) { Text("Size") }
-                    DropdownMenu(expanded = sizeMenuOpen, onDismissRequest = { sizeMenuOpen = false }) {
+                    TextButton(onClick = { menuOpen = true }) { Text("More") }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(text = { Text("+ Publisher") }, onClick = { menuOpen = false; showAddPublisher = true })
+                        androidx.compose.material3.HorizontalDivider()
                         CoverSize.entries.forEach { size ->
                             DropdownMenuItem(
                                 text = { Text("Covers: ${size.label}") },
                                 trailingIcon = if (coverSize == size) { { Text("✓") } } else null,
-                                onClick = { sizeMenuOpen = false; onCoverSizeChange(size) },
+                                onClick = { menuOpen = false; onCoverSizeChange(size) },
                             )
                         }
                     }
