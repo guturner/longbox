@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+enum class UpcScanResult { CHECKED, NOT_FOUND, NOT_READY }
+
 data class PullListUiState(
     val entries: List<PullListEntry> = emptyList(),
     /** FOLLOWED_PUBLISHERS plus any publishers seen in the user's library, for the picker. */
@@ -111,11 +113,14 @@ class PullListViewModel(
     }
 
     /** Called when a barcode is scanned from the pull list screen. Checks off the matching comic if found. */
-    fun checkOffByUpc(mainCode: String): Boolean {
-        val comics = (loadedComics.value as? Loadable.Ready)?.value ?: return false
-        val comic = comics.firstOrNull { it.upc == mainCode } ?: return false
+    fun checkOffByUpc(mainCode: String): UpcScanResult {
+        val comics = (loadedComics.value as? Loadable.Ready)?.value
+            ?: return UpcScanResult.NOT_READY
+        val normalised = mainCode.trimStart('0')
+        val comic = comics.firstOrNull { it.upc.trimStart('0') == normalised }
+            ?: return UpcScanResult.NOT_FOUND
         viewModelScope.launch { pullList.toggleCheck(week.value.start, comic.id) }
-        return true
+        return UpcScanResult.CHECKED
     }
 
     private fun loadWeek(w: ReleaseWeek) {

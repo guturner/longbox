@@ -41,6 +41,7 @@ import com.guturner.longbox.domain.model.ComicId
 import com.guturner.longbox.domain.model.PullListEntry
 import com.guturner.longbox.presentation.Loadable
 import com.guturner.longbox.presentation.PullListViewModel
+import com.guturner.longbox.presentation.UpcScanResult
 import com.guturner.longbox.ui.components.CenteredMessage
 import com.guturner.longbox.ui.components.CoverImage
 import com.guturner.longbox.ui.components.CoverSize
@@ -203,14 +204,18 @@ fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit, coverSize
     if (scanning) {
         platform.scanner?.Content(
             onDetected = { mainCode, _ ->
-                val found = viewModel.checkOffByUpc(mainCode)
-                if (found) {
-                    scope.launch { snackbar.showSnackbar("Checked off!") }
-                    scanning = false
-                } else {
-                    scope.launch { snackbar.showSnackbar("Not on your pull list this week") }
+                val result = viewModel.checkOffByUpc(mainCode)
+                when (result) {
+                    UpcScanResult.CHECKED -> {
+                        scope.launch { snackbar.showSnackbar("Checked off!") }
+                        scanning = false
+                    }
+                    UpcScanResult.NOT_FOUND ->
+                        scope.launch { snackbar.showSnackbar("Not on your pull list this week") }
+                    UpcScanResult.NOT_READY ->
+                        scope.launch { snackbar.showSnackbar("Still loading your pull list…") }
                 }
-                found
+                result == UpcScanResult.CHECKED
             },
             onClose = { scanning = false },
         )
