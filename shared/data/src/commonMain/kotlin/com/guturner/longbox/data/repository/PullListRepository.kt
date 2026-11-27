@@ -9,12 +9,12 @@ import com.guturner.longbox.domain.model.SeriesId
 import com.guturner.longbox.domain.model.matches
 import com.guturner.longbox.domain.repository.PullListRepository
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -61,9 +61,9 @@ class KeyValueStorePullListRepository(
     private val checks = MutableStateFlow<Map<String, Set<Long>>>(emptyMap())
     private val skips  = MutableStateFlow<Map<String, Set<Long>>>(emptyMap())
 
-    init {
-        appScope.launch { load() }
-    }
+    // Deferred so callers can await initial load before mutating state; avoids overwriting
+    // previously-saved entries when the user acts before the first disk read completes.
+    private val loadCompleted = appScope.async { load() }
 
     private suspend fun load() {
         store.read(LIST_KEY)
@@ -82,11 +82,13 @@ class KeyValueStorePullListRepository(
     override fun observe(): Flow<List<PullListEntry>> = state.asStateFlow()
 
     override suspend fun add(entry: PullListEntry) {
+        loadCompleted.await()
         state.update { current -> if (current.any { it == entry }) current else current + entry }
         persistList()
     }
 
     override suspend fun remove(entry: PullListEntry) {
+        loadCompleted.await()
         state.update { it.filterNot { e -> e == entry } }
         persistList()
     }
