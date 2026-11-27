@@ -2,6 +2,7 @@ package com.guturner.longbox.domain.library
 
 import com.guturner.longbox.domain.model.CalendarDate
 import com.guturner.longbox.domain.model.CollectionEntry
+import com.guturner.longbox.domain.model.ContainerId
 import com.guturner.longbox.domain.model.CreatorId
 import com.guturner.longbox.domain.model.EntryState
 import com.guturner.longbox.domain.model.PublisherId
@@ -19,12 +20,16 @@ data class LibraryFilter(
     val writerIds: Set<CreatorId> = emptySet(),
     val artistIds: Set<CreatorId> = emptySet(),
     val storyArcIds: Set<StoryArcId> = emptySet(),
+    val containerIds: Set<ContainerId> = emptySet(),
 ) {
     val isEmpty: Boolean
         get() = text.isBlank() && seriesIds.isEmpty() && publisherIds.isEmpty() &&
-            writerIds.isEmpty() && artistIds.isEmpty() && storyArcIds.isEmpty()
+            writerIds.isEmpty() && artistIds.isEmpty() && storyArcIds.isEmpty() &&
+            containerIds.isEmpty()
 
     fun matches(entry: CollectionEntry): Boolean {
+        if (containerIds.isNotEmpty() && entry.containerId !in containerIds) return false
+
         val comic = entry.comic
             ?: return isEmpty || (text.isNotBlank() && entry.scannedCode.contains(text.trim()))
 

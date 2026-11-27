@@ -5,6 +5,9 @@ import com.guturner.longbox.domain.model.CalendarDate
 import com.guturner.longbox.domain.model.CollectionEntry
 import com.guturner.longbox.domain.model.Comic
 import com.guturner.longbox.domain.model.ComicId
+import com.guturner.longbox.domain.model.Container
+import com.guturner.longbox.domain.model.ContainerId
+import com.guturner.longbox.domain.model.ContainerKind
 import com.guturner.longbox.domain.model.Creator
 import com.guturner.longbox.domain.model.CreatorId
 import com.guturner.longbox.domain.model.EntryId
@@ -67,6 +70,16 @@ interface SessionRepository {
     suspend fun restore(): Boolean
     suspend fun signInWithGoogle(idToken: String): Outcome<Unit>
     suspend fun signOut()
+}
+
+interface ContainerRepository {
+    fun observeContainers(): Flow<List<Container>>
+    suspend fun refresh(): Outcome<Unit>
+    suspend fun createContainer(name: String, kind: ContainerKind, clientMutationId: String? = null): Outcome<Container>
+    suspend fun renameContainer(id: ContainerId, newName: String): Outcome<Container>
+    suspend fun deleteContainer(id: ContainerId): Outcome<Unit>
+    suspend fun moveToContainer(entryId: EntryId, containerId: ContainerId): Outcome<CollectionEntry>
+    suspend fun removeFromContainer(entryId: EntryId): Outcome<CollectionEntry>
 }
 
 /** Abstracts "today" so use cases are deterministic under test. */

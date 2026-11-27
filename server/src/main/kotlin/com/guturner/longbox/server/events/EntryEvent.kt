@@ -36,22 +36,51 @@ sealed interface EntryEvent {
         override val entryId: UUID,
         override val occurredAt: Instant,
     ) : EntryEvent
-    // MovedToContainer added when FEAT-15 wires containers
+
+    data class MovedToContainer(
+        override val entryId: UUID,
+        override val occurredAt: Instant,
+        val containerId: UUID,
+        val containerKind: String,
+    ) : EntryEvent
+
+    data class RemovedFromContainer(
+        override val entryId: UUID,
+        override val occurredAt: Instant,
+    ) : EntryEvent
+
+    /** Fired when addScan hits the copy-count branch (not a new row). */
+    data class CopyRescanned(
+        override val entryId: UUID,
+        override val occurredAt: Instant,
+        val newCopyCount: Int,
+    ) : EntryEvent
 }
 
-/** Swappable: production = SharedFlowEntryEventBus, tests = RecordingEventPublisher. */
+/** Swappable: production = AppEventBus, tests = RecordingEventPublisher. */
 fun interface EntryEventPublisher {
     suspend fun publish(event: EntryEvent)
 }
 
-class SharedFlowEntryEventBus : EntryEventPublisher {
-    private val _events = MutableSharedFlow<EntryEvent>(
+/** Combined event bus for entry and container events. */
+class AppEventBus : EntryEventPublisher, ContainerEventPublisher {
+    private val _entryEvents = MutableSharedFlow<EntryEvent>(
         extraBufferCapacity = 256,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
-    val events: SharedFlow<EntryEvent> = _events.asSharedFlow()
-    override suspend fun publish(event: EntryEvent) { _events.emit(event) }
+    private val _containerEvents = MutableSharedFlow<ContainerEvent>(
+        extraBufferCapacity = 256,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val entryEvents: SharedFlow<EntryEvent> = _entryEvents.asSharedFlow()
+    val containerEvents: SharedFlow<ContainerEvent> = _containerEvents.asSharedFlow()
+
+    override suspend fun publish(event: EntryEvent) { _entryEvents.emit(event) }
+    override suspend fun publish(event: ContainerEvent) { _containerEvents.emit(event) }
 }
+
+/** Kept for backward compatibility with existing tests; prefer AppEventBus in production. */
+typealias SharedFlowEntryEventBus = AppEventBus
 
 class RecordingEventPublisher : EntryEventPublisher {
     val recorded = mutableListOf<EntryEvent>()

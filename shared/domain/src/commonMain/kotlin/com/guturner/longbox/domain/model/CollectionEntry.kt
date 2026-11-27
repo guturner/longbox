@@ -26,4 +26,7 @@ data class CollectionEntry(
     /** Scanned while away from home and still waiting in the device outbox. */
     val isQueuedOnDevice: Boolean = false,
     val copyCount: Int = 1,
+    val containerId: ContainerId? = null,
+    /** Denormalized container name for display without an extra lookup. */
+    val containerName: String? = null,
 )
