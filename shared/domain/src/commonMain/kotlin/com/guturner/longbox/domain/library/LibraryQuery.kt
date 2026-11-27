@@ -3,7 +3,7 @@ package com.guturner.longbox.domain.library
 import com.guturner.longbox.domain.model.CalendarDate
 import com.guturner.longbox.domain.model.CollectionEntry
 import com.guturner.longbox.domain.model.CreatorId
-import com.guturner.longbox.domain.model.LookupStatus
+import com.guturner.longbox.domain.model.EntryState
 import com.guturner.longbox.domain.model.PublisherId
 import com.guturner.longbox.domain.model.SeriesId
 import com.guturner.longbox.domain.model.StoryArcId
@@ -51,7 +51,7 @@ enum class LibrarySort {
 
     val comparator: Comparator<CollectionEntry>
         get() = when (this) {
-            SERIES_THEN_ISSUE -> compareBy<CollectionEntry> { it.status != LookupStatus.RESOLVED }
+            SERIES_THEN_ISSUE -> compareBy<CollectionEntry> { it.state != EntryState.IN_STACK }
                 .thenBy(nullsLast()) { it.comic?.series?.sortName?.lowercase() }
                 .thenBy(nullsLast()) { it.comic?.series?.yearBegan }
                 .thenBy(nullsLast()) { it.comic?.number }

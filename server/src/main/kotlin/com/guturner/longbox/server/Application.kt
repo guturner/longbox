@@ -15,8 +15,9 @@ import com.guturner.longbox.server.collection.ScanWorker
 import com.guturner.longbox.server.config.AppConfig
 import com.guturner.longbox.server.metron.MetronClient
 import com.guturner.longbox.server.metron.MetronRateLimiter
+import com.guturner.longbox.server.events.SharedFlowEntryEventBus
 import com.guturner.longbox.server.persistence.AuthStore
-import com.guturner.longbox.server.persistence.CollectionStore
+import com.guturner.longbox.server.persistence.JdbcCollectionStore
 import com.guturner.longbox.server.persistence.Database
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -74,9 +75,10 @@ fun Application.module(config: AppConfig) {
     val catalog = CachedMetronCatalog(db, metron)
     val authStore = AuthStore(db)
     val tokens = TokenService(authStore, GoogleApiIdentityVerifier(config.auth.googleClientIds), config.auth)
-    val collectionStore = CollectionStore(db)
-    val worker = ScanWorker(collectionStore, ResolveBarcodeUseCase(catalog))
-    val collection = CollectionService(collectionStore, worker)
+    val collectionStore = JdbcCollectionStore(db)
+    val eventBus = SharedFlowEntryEventBus()
+    val worker = ScanWorker(collectionStore, ResolveBarcodeUseCase(catalog), eventBus)
+    val collection = CollectionService(collectionStore, worker, eventBus)
 
     val imageClient = HttpClient(OkHttp) {
         followRedirects = false // a redirect could point the proxy at an internal host

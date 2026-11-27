@@ -6,7 +6,7 @@ import com.guturner.longbox.domain.barcode.BarcodeError
 import com.guturner.longbox.domain.model.CollectionEntry
 import com.guturner.longbox.domain.model.Cover
 import com.guturner.longbox.domain.model.EntryId
-import com.guturner.longbox.domain.model.LookupStatus
+import com.guturner.longbox.domain.model.EntryState
 import com.guturner.longbox.domain.usecase.CheckOwnershipUseCase
 import com.guturner.longbox.domain.usecase.Ownership
 import kotlinx.coroutines.test.runTest
@@ -20,8 +20,8 @@ class CheckOwnershipTest {
     private val issue1 = comic(9, absoluteBatman, "1", variants = listOf(Cover("Cover B", null, "${upc}00121")))
         .copy(coverA = Cover("Cover A", null, "${upc}00111"))
 
-    private fun owned(code: String, comic: com.guturner.longbox.domain.model.Comic?, cover: String? = null, status: LookupStatus = LookupStatus.RESOLVED) =
-        CollectionEntry(EntryId(code), code, status, comic, cover, 0)
+    private fun owned(code: String, comic: com.guturner.longbox.domain.model.Comic?, cover: String? = null, state: EntryState = EntryState.IN_STACK) =
+        CollectionEntry(EntryId(code), code, state, comic, cover, 0)
 
     @Test
     fun testExactCopyIsOwned() = runTest {
@@ -44,7 +44,7 @@ class CheckOwnershipTest {
     @Test
     fun testQueuedOfflineScanCountsAsOwned() = runTest {
         // A comic bought while roaming is pending (no catalog data yet) but must still show as owned.
-        val useCase = CheckOwnershipUseCase(FakeCollectionRepository(listOf(owned("${upc}00211", null, status = LookupStatus.PENDING))))
+        val useCase = CheckOwnershipUseCase(FakeCollectionRepository(listOf(owned("${upc}00211", null, state = EntryState.PENDING))))
 
         assertIs<Ownership.Owned>(useCase(upc, "00211"))
         assertIs<Ownership.NotOwned>(useCase(upc, "00311"))

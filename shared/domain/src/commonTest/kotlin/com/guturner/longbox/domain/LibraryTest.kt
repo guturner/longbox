@@ -17,7 +17,7 @@ import com.guturner.longbox.domain.library.LibraryFilter
 import com.guturner.longbox.domain.library.LibraryQuery
 import com.guturner.longbox.domain.library.LibrarySort
 import com.guturner.longbox.domain.model.CalendarDate
-import com.guturner.longbox.domain.model.LookupStatus
+import com.guturner.longbox.domain.model.EntryState
 import com.guturner.longbox.domain.usecase.ObserveLibraryUseCase
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -31,7 +31,7 @@ class LibraryTest {
     private val batman2 = entry(comic(2, batman, "2", credits = listOf(writer(king), penciller(janin)), arcs = listOf(absolutePower)), added = 2)
     private val absolute1 = entry(comic(3, absoluteBatman, "1", storeDate = CalendarDate(2024, 10, 9), credits = listOf(writer(snyder), penciller(dragotta))), added = 3)
     private val xMen1 = entry(comic(4, xMen, "1", publisher = marvel, storeDate = CalendarDate(2024, 7, 10)), added = 4)
-    private val pending = entry(null, added = 5, status = LookupStatus.PENDING)
+    private val pending = entry(null, added = 5, state = EntryState.PENDING)
 
     private val all = listOf(xMen1, batman10, pending, absolute1, batman2)
 

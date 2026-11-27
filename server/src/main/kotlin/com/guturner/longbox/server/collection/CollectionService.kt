@@ -5,6 +5,8 @@ import com.guturner.longbox.domain.barcode.ComicBarcode
 import com.guturner.longbox.domain.model.CollectionEntry
 import com.guturner.longbox.domain.model.DomainError
 import com.guturner.longbox.domain.model.Outcome
+import com.guturner.longbox.server.events.EntryEvent
+import com.guturner.longbox.server.events.EntryEventPublisher
 import com.guturner.longbox.server.persistence.CollectionStore
 import java.time.Duration
 import java.time.Instant
@@ -14,6 +16,7 @@ import java.util.UUID
 class CollectionService(
     private val store: CollectionStore,
     private val worker: ScanWorker,
+    private val events: EntryEventPublisher,
     private val now: () -> Instant = Instant::now,
 ) {
 
@@ -42,13 +45,17 @@ class CollectionService(
             ?.takeIf { it.isBefore(now().plusSeconds(300)) && it.isAfter(now().minus(Duration.ofDays(365))) }
             ?: now()
         val id = store.insertPending(userId, barcode.fullCode, addedAt, clientMutationId)
+        events.publish(EntryEvent.Scanned(id, now(), barcode.fullCode))
         worker.wakeUp()
         return store.find(userId, id)?.let { Outcome.Success(it) } ?: Outcome.Failure(DomainError.Unexpected("insert failed"))
     }
 
     suspend fun remove(userId: UUID, entryId: String): Outcome<Unit> {
         val id = runCatching { UUID.fromString(entryId) }.getOrNull() ?: return Outcome.Failure(DomainError.NotFound)
-        return if (store.delete(userId, id)) Outcome.Success(Unit) else Outcome.Failure(DomainError.NotFound)
+        return if (store.delete(userId, id)) {
+            events.publish(EntryEvent.Removed(id, now()))
+            Outcome.Success(Unit)
+        } else Outcome.Failure(DomainError.NotFound)
     }
 
     private companion object {

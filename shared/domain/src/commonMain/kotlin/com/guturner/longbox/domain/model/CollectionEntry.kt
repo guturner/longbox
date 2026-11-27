@@ -2,11 +2,13 @@ package com.guturner.longbox.domain.model
 
 data class EntryId(val value: String)
 
-/** Where a scan is in its lookup. Lookups are queued server-side to respect Metron's rate limit. */
-enum class LookupStatus {
-    PENDING,
-    RESOLVED,
-    NOT_FOUND,
+/** Full lifecycle of a physical comic in the collection. */
+enum class EntryState {
+    PENDING,       // scanned, catalog lookup queued or in progress
+    LOOKUP_FAILED, // not found in catalog (after retries exhausted)
+    IN_STACK,      // catalog resolved, organized in a named stack
+    IN_BOX,        // in a physical box (FEAT-15)
+    DELETED,       // removed from collection
 }
 
 /**
@@ -16,7 +18,7 @@ enum class LookupStatus {
 data class CollectionEntry(
     val id: EntryId,
     val scannedCode: String,
-    val status: LookupStatus,
+    val state: EntryState,
     val comic: Comic?,
     /** Name of the cover this copy has, when the barcode identifies a variant. */
     val ownedCoverName: String?,

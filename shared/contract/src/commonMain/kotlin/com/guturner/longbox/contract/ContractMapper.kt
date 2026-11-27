@@ -11,8 +11,8 @@ import com.guturner.longbox.domain.model.CreatorRef
 import com.guturner.longbox.domain.model.CreatorRole
 import com.guturner.longbox.domain.model.Credit
 import com.guturner.longbox.domain.model.EntryId
+import com.guturner.longbox.domain.model.EntryState
 import com.guturner.longbox.domain.model.IssueNumber
-import com.guturner.longbox.domain.model.LookupStatus
 import com.guturner.longbox.domain.model.Publisher
 import com.guturner.longbox.domain.model.PublisherId
 import com.guturner.longbox.domain.model.Series
@@ -69,7 +69,7 @@ object ContractMapper {
     fun asEntryDto(entry: CollectionEntry): CollectionEntryDto = CollectionEntryDto(
         id = entry.id.value,
         scannedCode = entry.scannedCode,
-        status = entry.status.name,
+        status = entry.state.name,
         comic = entry.comic?.let(::asComicDto),
         ownedCoverName = entry.ownedCoverName,
         addedAtEpochMillis = entry.addedAtEpochMillis,
@@ -77,11 +77,20 @@ object ContractMapper {
     )
 
     fun asEntry(dto: CollectionEntryDto): CollectionEntry? {
-        val status = LookupStatus.entries.firstOrNull { it.name == dto.status } ?: return null
+        // "RESOLVED" and "NOT_FOUND" are legacy values from before FEAT-19 that may still be in
+        // on-device caches. Map them forward to their EntryState equivalents.
+        val state = when (dto.status) {
+            "PENDING" -> EntryState.PENDING
+            "RESOLVED", "IN_STACK" -> EntryState.IN_STACK
+            "NOT_FOUND", "LOOKUP_FAILED" -> EntryState.LOOKUP_FAILED
+            "IN_BOX" -> EntryState.IN_BOX
+            "DELETED" -> EntryState.DELETED
+            else -> return null
+        }
         return CollectionEntry(
             id = EntryId(dto.id),
             scannedCode = dto.scannedCode,
-            status = status,
+            state = state,
             comic = dto.comic?.let(::asComic),
             ownedCoverName = dto.ownedCoverName,
             addedAtEpochMillis = dto.addedAtEpochMillis,

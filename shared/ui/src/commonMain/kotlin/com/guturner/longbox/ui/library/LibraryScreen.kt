@@ -42,7 +42,7 @@ import com.guturner.longbox.domain.library.Facet
 import com.guturner.longbox.domain.library.LibrarySort
 import com.guturner.longbox.domain.model.CollectionEntry
 import com.guturner.longbox.domain.model.ComicId
-import com.guturner.longbox.domain.model.LookupStatus
+import com.guturner.longbox.domain.model.EntryState
 import com.guturner.longbox.presentation.LibraryViewModel
 import com.guturner.longbox.ui.components.CenteredMessage
 import com.guturner.longbox.ui.components.CoverImage
@@ -238,7 +238,7 @@ private fun LibraryTile(entry: CollectionEntry, onClick: () -> Unit, onDismiss: 
         when {
             comic != null -> CoverImage(comic.coverA.imageUrl, contentDescription = comic.displayTitle)
             entry.isQueuedOnDevice -> PendingCover("Saved offline\n${entry.scannedCode}")
-            entry.status == LookupStatus.PENDING -> PendingCover("Looking up\n${entry.scannedCode}")
+            entry.state == EntryState.PENDING -> PendingCover("Looking up\n${entry.scannedCode}")
             else -> PendingCover("Not in catalog yet\n${entry.scannedCode}")
         }
         onDismiss?.let { dismiss ->

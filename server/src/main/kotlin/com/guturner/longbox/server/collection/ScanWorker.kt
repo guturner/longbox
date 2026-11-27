@@ -5,6 +5,8 @@ import com.guturner.longbox.domain.barcode.ComicBarcode
 import com.guturner.longbox.domain.model.DomainError
 import com.guturner.longbox.domain.model.Outcome
 import com.guturner.longbox.domain.usecase.ResolveBarcodeUseCase
+import com.guturner.longbox.server.events.EntryEvent
+import com.guturner.longbox.server.events.EntryEventPublisher
 import com.guturner.longbox.server.persistence.CollectionStore
 import com.guturner.longbox.server.persistence.QueuedScan
 import kotlinx.coroutines.CoroutineScope
@@ -26,6 +28,7 @@ import kotlin.math.min
 class ScanWorker(
     private val store: CollectionStore,
     private val resolve: ResolveBarcodeUseCase,
+    private val events: EntryEventPublisher,
     private val now: () -> Instant = Instant::now,
 ) {
     private val log = LoggerFactory.getLogger(ScanWorker::class.java)
@@ -48,10 +51,11 @@ class ScanWorker(
         }
     }
 
-    private suspend fun process(scan: QueuedScan) {
+    internal suspend fun process(scan: QueuedScan) {
         val barcode = (ComicBarcode.parse(scan.code) as? BarcodeParseResult.Valid)?.barcode
         if (barcode == null) {
             store.markNotFound(scan.entryId, now().plus(Duration.ofDays(3650)))
+            events.publish(EntryEvent.LookupFailed(scan.entryId, now(), scan.attempts + 1, permanent = true))
             return
         }
 
@@ -60,9 +64,12 @@ class ScanWorker(
                 val resolved = result.value
                 if (resolved != null) {
                     store.markResolved(scan.entryId, resolved.comic.id.value, resolved.ownedCoverName)
+                    events.publish(EntryEvent.LookupSucceeded(scan.entryId, now(), resolved.comic.id.value, resolved.ownedCoverName))
                 } else {
                     // New releases often reach Metron a few days after street date; keep checking daily.
                     store.markNotFound(scan.entryId, now().plus(NOT_FOUND_RECHECK))
+                    val permanent = scan.attempts + 1 >= MAX_NOT_FOUND_RETRIES
+                    events.publish(EntryEvent.LookupFailed(scan.entryId, now(), scan.attempts + 1, permanent))
                 }
             }
             is Outcome.Failure -> when (val error = result.error) {

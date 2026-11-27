@@ -11,7 +11,7 @@ import com.guturner.longbox.domain.model.CreatorRole
 import com.guturner.longbox.domain.model.Credit
 import com.guturner.longbox.domain.model.EntryId
 import com.guturner.longbox.domain.model.IssueNumber
-import com.guturner.longbox.domain.model.LookupStatus
+import com.guturner.longbox.domain.model.EntryState
 import com.guturner.longbox.domain.model.Publisher
 import com.guturner.longbox.domain.model.PublisherId
 import com.guturner.longbox.domain.model.Series
@@ -62,6 +62,6 @@ object Fixtures {
     fun writer(c: CreatorRef) = Credit(c, setOf(CreatorRole.WRITER))
     fun penciller(c: CreatorRef) = Credit(c, setOf(CreatorRole.PENCILLER))
 
-    fun entry(comic: Comic?, added: Long, status: LookupStatus = LookupStatus.RESOLVED) =
-        CollectionEntry(EntryId("e$added"), "000000000000", status, comic, null, added)
+    fun entry(comic: Comic?, added: Long, state: EntryState = EntryState.IN_STACK) =
+        CollectionEntry(EntryId("e$added"), "000000000000", state, comic, null, added)
 }

@@ -9,7 +9,7 @@ import com.guturner.longbox.domain.library.LibrarySort
 import com.guturner.longbox.domain.model.CollectionEntry
 import com.guturner.longbox.domain.model.CreatorId
 import com.guturner.longbox.domain.model.EntryId
-import com.guturner.longbox.domain.model.LookupStatus
+import com.guturner.longbox.domain.model.EntryState
 import com.guturner.longbox.domain.model.Outcome
 import com.guturner.longbox.domain.model.PublisherId
 import com.guturner.longbox.domain.model.SeriesId
@@ -72,7 +72,7 @@ class LibraryViewModel(
                 facets = view.facets,
                 query = q,
                 totalInCollection = view.totalInCollection,
-                pendingCount = view.entries.count { it.status == LookupStatus.PENDING },
+                pendingCount = view.entries.count { it.state == EntryState.PENDING },
                 isRefreshing = t.isRefreshing,
                 message = t.message,
                 sync = syncState,
@@ -84,7 +84,7 @@ class LibraryViewModel(
         // Pending scans resolve server-side at the catalog's pace; poll gently until they settle.
         viewModelScope.launch {
             // Only while home: when roaming, the repository's own probe loop handles reconnection.
-            state.map { it.sync.serverReachable && it.entries.any { e -> e.status == LookupStatus.PENDING && !e.isQueuedOnDevice } }
+            state.map { it.sync.serverReachable && it.entries.any { e -> e.state == EntryState.PENDING && !e.isQueuedOnDevice } }
                 .distinctUntilChanged().collectLatest { hasPending ->
                 while (hasPending) {
                     delay(POLL_INTERVAL_MS)

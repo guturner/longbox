@@ -16,7 +16,7 @@ import com.guturner.longbox.domain.barcode.ComicBarcode
 import com.guturner.longbox.domain.model.CollectionEntry
 import com.guturner.longbox.domain.model.DomainError
 import com.guturner.longbox.domain.model.EntryId
-import com.guturner.longbox.domain.model.LookupStatus
+import com.guturner.longbox.domain.model.EntryState
 import com.guturner.longbox.domain.model.Outcome
 import com.guturner.longbox.domain.repository.CollectionRepository
 import com.guturner.longbox.domain.repository.SyncController
@@ -215,7 +215,7 @@ class OfflineFirstCollectionRepository(
     private fun asLocalEntry(change: PendingChange.AddScan) = CollectionEntry(
         id = EntryId(LOCAL_PREFIX + change.id),
         scannedCode = change.code + (change.addOn ?: ""),
-        status = LookupStatus.PENDING,
+        state = EntryState.PENDING,
         comic = null,
         ownedCoverName = null,
         addedAtEpochMillis = change.createdAtEpochMillis,

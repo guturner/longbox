@@ -53,7 +53,7 @@ data class ComicDto(
 data class CollectionEntryDto(
     val id: String,
     val scannedCode: String,
-    val status: String,              // PENDING | RESOLVED | NOT_FOUND
+    val status: String,              // PENDING | IN_STACK | LOOKUP_FAILED | IN_BOX | DELETED (legacy: RESOLVED, NOT_FOUND)
     val comic: ComicDto? = null,
     val ownedCoverName: String? = null,
     val addedAtEpochMillis: Long,

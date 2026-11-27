@@ -3,7 +3,7 @@ package com.guturner.longbox.presentation
 import com.guturner.longbox.domain.barcode.ComicBarcode
 import com.guturner.longbox.domain.model.CollectionEntry
 import com.guturner.longbox.domain.model.EntryId
-import com.guturner.longbox.domain.model.LookupStatus
+import com.guturner.longbox.domain.model.EntryState
 import com.guturner.longbox.domain.model.Outcome
 import com.guturner.longbox.domain.repository.CollectionRepository
 import com.guturner.longbox.domain.usecase.CheckOwnershipUseCase
@@ -33,7 +33,7 @@ class ScanViewModelTest {
         override suspend fun remove(id: EntryId) = Outcome.Success(Unit)
         override suspend fun addScan(barcode: ComicBarcode): Outcome<CollectionEntry> {
             scans += barcode.fullCode
-            val entry = CollectionEntry(EntryId("local-${scans.size}"), barcode.fullCode, LookupStatus.PENDING, null, null, 0, isQueuedOnDevice = true)
+            val entry = CollectionEntry(EntryId("local-${scans.size}"), barcode.fullCode, EntryState.PENDING, null, null, 0, isQueuedOnDevice = true)
             entries.value = entries.value + entry
             return Outcome.Success(entry)
         }
