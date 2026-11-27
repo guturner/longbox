@@ -1,5 +1,6 @@
 package com.guturner.longbox.ui
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -53,20 +54,32 @@ import kotlinx.serialization.Serializable
 /** Root of every client. Platform shells only supply [graph] and [platform]. */
 @Composable
 fun LongboxApp(graph: AppGraph, platform: PlatformServices) {
+    val themeMode by graph.themeMode.collectAsStateWithLifecycle()
+    val isDark = when (themeMode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
     CompositionLocalProvider(LocalPlatform provides platform) {
-        LongboxTheme {
+        LongboxTheme(isDark = isDark) {
             val session = viewModel { SessionViewModel(graph.sessionRepository) }
             when (session.phase.collectAsStateWithLifecycle().value) {
                 SessionPhase.RESTORING -> CenteredMessage("Opening your longbox…")
                 SessionPhase.SIGNED_OUT -> SignInScreen(session)
-                SessionPhase.SIGNED_IN -> SignedInApp(graph, platform, onSignOut = session::signOut)
+                SessionPhase.SIGNED_IN -> SignedInApp(graph, platform, themeMode, onSignOut = session::signOut, onThemeModeChange = graph::setThemeMode)
             }
         }
     }
 }
 
 @Composable
-private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: () -> Unit) {
+private fun SignedInApp(
+    graph: AppGraph,
+    platform: PlatformServices,
+    themeMode: ThemeMode,
+    onSignOut: () -> Unit,
+    onThemeModeChange: (ThemeMode) -> Unit,
+) {
     val nav = rememberNavController()
     val goHome: () -> Unit = { nav.popBackStack(LibraryRoute, inclusive = false) }
     // Activity/window-scoped so filters survive navigating into details and back.
@@ -94,6 +107,8 @@ private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: 
                 onSignOut = onSignOut,
                 coverSize = coverSize,
                 onCoverSizeChange = graph::setCoverSize,
+                themeMode = themeMode,
+                onThemeModeChange = onThemeModeChange,
                 stacks = containersState.stacks,
                 boxes = containersState.boxes,
             )

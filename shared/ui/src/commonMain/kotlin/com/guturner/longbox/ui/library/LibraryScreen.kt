@@ -50,6 +50,7 @@ import com.guturner.longbox.domain.model.ContainerKind
 import com.guturner.longbox.domain.model.EntryId
 import com.guturner.longbox.domain.model.EntryState
 import com.guturner.longbox.presentation.LibraryViewModel
+import com.guturner.longbox.ui.ThemeMode
 import com.guturner.longbox.ui.components.CenteredMessage
 import com.guturner.longbox.ui.components.CoverImage
 import com.guturner.longbox.ui.components.CoverSize
@@ -74,6 +75,8 @@ internal fun LibraryScreen(
     onSignOut: () -> Unit,
     coverSize: CoverSize,
     onCoverSizeChange: (CoverSize) -> Unit,
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    onThemeModeChange: (ThemeMode) -> Unit = {},
     stacks: List<Container> = emptyList(),
     boxes: List<Container> = emptyList(),
 ) {
@@ -113,6 +116,14 @@ internal fun LibraryScreen(
                                 text = { Text("Covers: ${size.label}") },
                                 trailingIcon = if (coverSize == size) { { Text("✓") } } else null,
                                 onClick = { menuOpen = false; onCoverSizeChange(size) },
+                            )
+                        }
+                        androidx.compose.material3.HorizontalDivider()
+                        ThemeMode.entries.forEach { mode ->
+                            DropdownMenuItem(
+                                text = { Text("Theme: ${mode.label}") },
+                                trailingIcon = if (themeMode == mode) { { Text("✓") } } else null,
+                                onClick = { menuOpen = false; onThemeModeChange(mode) },
                             )
                         }
                     }
@@ -273,12 +284,13 @@ private fun LibraryTile(
     onDismiss: (() -> Unit)? = null,
 ) {
     val comic = entry.comic
+    val colorKey = entry.id.value.hashCode()
     Column(Modifier.combinedClickable(enabled = true, onClick = { if (comic != null) onClick() }, onLongClick = onLongClick)) {
         when {
             comic != null -> CoverImage(comic.coverA.imageUrl, contentDescription = comic.displayTitle)
-            entry.isQueuedOnDevice -> PendingCover("Saved offline\n${entry.scannedCode}")
-            entry.state == EntryState.PENDING -> PendingCover("Looking up\n${entry.scannedCode}")
-            else -> PendingCover("Not in catalog yet\n${entry.scannedCode}")
+            entry.isQueuedOnDevice -> PendingCover("Saved offline\n${entry.scannedCode}", colorKey)
+            entry.state == EntryState.PENDING -> PendingCover("Looking up\n${entry.scannedCode}", colorKey)
+            else -> PendingCover("Not in catalog yet\n${entry.scannedCode}", colorKey)
         }
         onDismiss?.let { dismiss ->
             TextButton(onClick = dismiss, modifier = Modifier.padding(top = 2.dp)) { Text("Remove") }

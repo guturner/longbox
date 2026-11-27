@@ -48,17 +48,28 @@ class AppGraph(
     private val _coverSize = MutableStateFlow(CoverSize.MEDIUM)
     internal val coverSize: StateFlow<CoverSize> = _coverSize.asStateFlow()
 
+    private val _themeMode = MutableStateFlow(ThemeMode.SYSTEM)
+    internal val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
+
     init {
         appScope.launch {
             localStore.read(StoreKeys.COVER_SIZE)
                 ?.let { name -> CoverSize.entries.find { it.name == name } }
                 ?.let { _coverSize.value = it }
+            localStore.read(StoreKeys.THEME_MODE)
+                ?.let { name -> ThemeMode.entries.find { it.name == name } }
+                ?.let { _themeMode.value = it }
         }
     }
 
     internal fun setCoverSize(size: CoverSize) {
         _coverSize.value = size
         appScope.launch { localStore.write(StoreKeys.COVER_SIZE, size.name) }
+    }
+
+    internal fun setThemeMode(mode: ThemeMode) {
+        _themeMode.value = mode
+        appScope.launch { localStore.write(StoreKeys.THEME_MODE, mode.name) }
     }
 
     private val offlineFirst = OfflineFirstCollectionRepository(api, localStore, appScope, nowMillis)

@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.guturner.longbox.ui.LocalPlatform
+import com.guturner.longbox.ui.rainbowFor
 import longbox.shared.ui.generated.resources.Res
 import longbox.shared.ui.generated.resources.longbox_logo
 import org.jetbrains.compose.resources.painterResource
@@ -63,16 +64,17 @@ fun CoverImage(url: String?, contentDescription: String, modifier: Modifier = Mo
 }
 
 @Composable
-fun PendingCover(label: String, modifier: Modifier = Modifier) {
+fun PendingCover(label: String, colorKey: Int = 0, modifier: Modifier = Modifier) {
+    val accent = rainbowFor(colorKey)
     Box(
         modifier
             .aspectRatio(COVER_ASPECT)
             .clip(RoundedCornerShape(4.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(accent.copy(alpha = 0.18f))
             .padding(8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        CircularProgressIndicator()
+        CircularProgressIndicator(color = accent)
         Text(label, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, modifier = Modifier.align(Alignment.BottomCenter))
     }
 }

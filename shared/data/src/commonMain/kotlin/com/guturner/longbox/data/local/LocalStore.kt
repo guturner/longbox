@@ -88,6 +88,7 @@ object StoreKeys {
     const val OUTBOX = "outbox-v1"
     const val COVER_SIZE = "cover-size-v1"
     const val CONTAINERS = "containers-cache-v1"
+    const val THEME_MODE = "theme-mode-v1"
 }
 
 /** Used in tests and as a fallback when a platform has no persistent storage. */
