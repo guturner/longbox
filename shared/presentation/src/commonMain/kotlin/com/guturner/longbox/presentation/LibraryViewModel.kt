@@ -7,6 +7,7 @@ import com.guturner.longbox.domain.library.LibraryFilter
 import com.guturner.longbox.domain.library.LibraryQuery
 import com.guturner.longbox.domain.library.LibrarySort
 import com.guturner.longbox.domain.model.CollectionEntry
+import com.guturner.longbox.domain.model.ContainerId
 import com.guturner.longbox.domain.model.CreatorId
 import com.guturner.longbox.domain.model.EntryId
 import com.guturner.longbox.domain.model.EntryState
@@ -14,6 +15,7 @@ import com.guturner.longbox.domain.model.Outcome
 import com.guturner.longbox.domain.model.PublisherId
 import com.guturner.longbox.domain.model.SeriesId
 import com.guturner.longbox.domain.model.StoryArcId
+import com.guturner.longbox.domain.repository.ContainerRepository
 import com.guturner.longbox.domain.repository.SyncController
 import com.guturner.longbox.domain.repository.SyncState
 import com.guturner.longbox.domain.usecase.ObserveLibraryUseCase
@@ -58,6 +60,7 @@ class LibraryViewModel(
     private val refreshCollection: RefreshCollectionUseCase,
     private val removeFromCollection: RemoveFromCollectionUseCase,
     sync: SyncController,
+    private val containers: ContainerRepository? = null,
 ) : ViewModel() {
 
     private val query = MutableStateFlow(LibraryQuery())
@@ -108,6 +111,7 @@ class LibraryViewModel(
     fun toggleWriter(id: CreatorId) = updateFilter { it.copy(writerIds = it.writerIds.toggle(id)) }
     fun toggleArtist(id: CreatorId) = updateFilter { it.copy(artistIds = it.artistIds.toggle(id)) }
     fun toggleStoryArc(id: StoryArcId) = updateFilter { it.copy(storyArcIds = it.storyArcIds.toggle(id)) }
+    fun toggleContainer(id: ContainerId) = updateFilter { it.copy(containerIds = it.containerIds.toggle(id)) }
     fun clearFilters() = updateFilter { LibraryFilter() }
     fun setSort(sort: LibrarySort) = query.update { it.copy(sort = sort) }
 
@@ -125,6 +129,20 @@ class LibraryViewModel(
         val unresolved = state.value.entries.filter { it.comic == null }.map { it.id }
         unresolved.forEach { id ->
             viewModelScope.launch { removeFromCollection(id) }
+        }
+    }
+
+    fun moveToContainer(entryId: EntryId, containerId: ContainerId) {
+        viewModelScope.launch {
+            val result = containers?.moveToContainer(entryId, containerId)
+            if (result is Outcome.Failure) transient.update { it.copy(message = result.error.toUiMessage()) }
+        }
+    }
+
+    fun removeFromContainer(entryId: EntryId) {
+        viewModelScope.launch {
+            val result = containers?.removeFromContainer(entryId)
+            if (result is Outcome.Failure) transient.update { it.copy(message = result.error.toUiMessage()) }
         }
     }
 

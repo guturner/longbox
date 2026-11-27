@@ -12,12 +12,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.guturner.longbox.domain.library.LibraryFilter
 import com.guturner.longbox.domain.model.ComicId
+import com.guturner.longbox.domain.model.ContainerId
 import com.guturner.longbox.domain.model.CreatorId
 import com.guturner.longbox.domain.model.PullListEntry
 import com.guturner.longbox.domain.model.StoryArcId
 import com.guturner.longbox.presentation.ComicDetailViewModel
+import com.guturner.longbox.presentation.ContainersViewModel
 import com.guturner.longbox.presentation.CreatorViewModel
 import com.guturner.longbox.presentation.LibraryViewModel
 import com.guturner.longbox.presentation.PullListViewModel
@@ -29,6 +32,7 @@ import com.guturner.longbox.presentation.SessionViewModel
 import com.guturner.longbox.presentation.StoryArcViewModel
 import com.guturner.longbox.ui.components.CenteredMessage
 import com.guturner.longbox.ui.components.CoverSize
+import com.guturner.longbox.ui.containers.ContainersScreen
 import com.guturner.longbox.ui.detail.ComicDetailScreen
 import com.guturner.longbox.ui.detail.CreatorScreen
 import com.guturner.longbox.ui.detail.StoryArcScreen
@@ -44,6 +48,7 @@ import kotlinx.serialization.Serializable
 @Serializable internal data object ReleasesRoute
 @Serializable internal data object PullListRoute
 @Serializable internal data class ScanRoute(val check: Boolean)
+@Serializable internal data object ContainersRoute
 
 /** Root of every client. Platform shells only supply [graph] and [platform]. */
 @Composable
@@ -66,8 +71,10 @@ private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: 
     val goHome: () -> Unit = { nav.popBackStack(LibraryRoute, inclusive = false) }
     // Activity/window-scoped so filters survive navigating into details and back.
     val library = viewModel {
-        LibraryViewModel(graph.observeLibrary, graph.refreshCollection, graph.removeFromCollection, graph.sync)
+        LibraryViewModel(graph.observeLibrary, graph.refreshCollection, graph.removeFromCollection, graph.sync, graph.containerRepository)
     }
+    val containersVm = viewModel { ContainersViewModel(graph.containerRepository) }
+    val containersState by containersVm.state.collectAsStateWithLifecycle()
     val pullListVm = viewModel { PullListViewModel(graph.pullList, graph.collectionRepository, graph.getWeeklyReleases, graph.clock) }
     val manualScan = viewModel(key = "manual-scan") { ScanViewModel(graph.scanComic, graph.checkOwnership, graph.nowMillis) }
     var showManualEntry by remember { mutableStateOf(false) }
@@ -83,9 +90,12 @@ private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: 
                 onAddManually = { showManualEntry = true },
                 onOpenReleases = { nav.navigate(ReleasesRoute) },
                 onOpenPullList = { nav.navigate(PullListRoute) },
+                onOpenContainers = { nav.navigate(ContainersRoute) },
                 onSignOut = onSignOut,
                 coverSize = coverSize,
                 onCoverSizeChange = graph::setCoverSize,
+                stacks = containersState.stacks,
+                boxes = containersState.boxes,
             )
         }
         composable<ComicRoute> { entry ->
@@ -133,6 +143,16 @@ private fun SignedInApp(graph: AppGraph, platform: PlatformServices, onSignOut: 
                 ScanViewModel(graph.scanComic, graph.checkOwnership, graph.nowMillis, if (check) ScanMode.CHECK else ScanMode.ADD)
             }
             ScanScreen(vm, scanner, onClose = { nav.popBackStack() })
+        }
+        composable<ContainersRoute> {
+            ContainersScreen(
+                viewModel = containersVm,
+                onGoHome = goHome,
+                onFilterByContainer = { containerId ->
+                    library.showOnly(LibraryFilter(containerIds = setOf(containerId)))
+                    goHome()
+                },
+            )
         }
     }
 

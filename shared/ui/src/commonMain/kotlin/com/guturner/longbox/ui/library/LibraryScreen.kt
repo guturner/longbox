@@ -1,6 +1,8 @@
 package com.guturner.longbox.ui.library
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -42,6 +44,10 @@ import com.guturner.longbox.domain.library.Facet
 import com.guturner.longbox.domain.library.LibrarySort
 import com.guturner.longbox.domain.model.CollectionEntry
 import com.guturner.longbox.domain.model.ComicId
+import com.guturner.longbox.domain.model.Container
+import com.guturner.longbox.domain.model.ContainerId
+import com.guturner.longbox.domain.model.ContainerKind
+import com.guturner.longbox.domain.model.EntryId
 import com.guturner.longbox.domain.model.EntryState
 import com.guturner.longbox.presentation.LibraryViewModel
 import com.guturner.longbox.ui.components.CenteredMessage
@@ -50,8 +56,9 @@ import com.guturner.longbox.ui.components.CoverSize
 import com.guturner.longbox.ui.components.HomeIconButton
 import com.guturner.longbox.ui.components.MetronAttribution
 import com.guturner.longbox.ui.components.PendingCover
+import com.guturner.longbox.ui.containers.MoveToContainerSheet
 
-private enum class FacetKind(val label: String) { SERIES("Title"), WRITER("Writer"), ARTIST("Artist"), EVENT("Event"), PUBLISHER("Publisher") }
+private enum class FacetKind(val label: String) { SERIES("Title"), WRITER("Writer"), ARTIST("Artist"), EVENT("Event"), PUBLISHER("Publisher"), CONTAINER("Container") }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,14 +70,18 @@ internal fun LibraryScreen(
     onAddManually: () -> Unit,
     onOpenReleases: () -> Unit,
     onOpenPullList: () -> Unit,
+    onOpenContainers: () -> Unit,
     onSignOut: () -> Unit,
     coverSize: CoverSize,
     onCoverSizeChange: (CoverSize) -> Unit,
+    stacks: List<Container> = emptyList(),
+    boxes: List<Container> = emptyList(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var openFacet by remember { mutableStateOf<FacetKind?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
+    var moveSheetEntry by remember { mutableStateOf<EntryId?>(null) }
 
     LaunchedEffect(state.message) {
         state.message?.let { snackbar.showSnackbar(it.text); viewModel.dismissMessage() }
@@ -94,6 +105,7 @@ internal fun LibraryScreen(
                         if (state.entries.any { it.comic == null }) {
                             DropdownMenuItem(text = { Text("Remove all unresolved") }, onClick = { menuOpen = false; viewModel.removeAllUnresolved() })
                         }
+                        DropdownMenuItem(text = { Text("Stacks & Boxes") }, onClick = { menuOpen = false; onOpenContainers() })
                         DropdownMenuItem(text = { Text("Sign out") }, onClick = { menuOpen = false; onSignOut() })
                         androidx.compose.material3.HorizontalDivider()
                         CoverSize.entries.forEach { size ->
@@ -128,6 +140,7 @@ internal fun LibraryScreen(
                     FacetKind.ARTIST to state.query.filter.artistIds.size,
                     FacetKind.EVENT to state.query.filter.storyArcIds.size,
                     FacetKind.PUBLISHER to state.query.filter.publisherIds.size,
+                    FacetKind.CONTAINER to state.query.filter.containerIds.size,
                 ),
                 sort = state.query.sort,
                 onOpen = { openFacet = it },
@@ -171,6 +184,7 @@ internal fun LibraryScreen(
                         LibraryTile(
                             entry,
                             onClick = { entry.comic?.let { onOpenComic(it.id) } },
+                            onLongClick = { moveSheetEntry = entry.id },
                             onDismiss = if (entry.comic == null) { { viewModel.remove(entry.id) } } else null,
                         )
                     }
@@ -188,7 +202,26 @@ internal fun LibraryScreen(
             FacetKind.ARTIST -> FacetPickerDialog(kind.label, facets.artists, state.query.filter.artistIds, viewModel::toggleArtist) { openFacet = null }
             FacetKind.EVENT -> FacetPickerDialog(kind.label, facets.storyArcs, state.query.filter.storyArcIds, viewModel::toggleStoryArc) { openFacet = null }
             FacetKind.PUBLISHER -> FacetPickerDialog(kind.label, facets.publishers, state.query.filter.publisherIds, viewModel::togglePublisher) { openFacet = null }
+            FacetKind.CONTAINER -> ContainerPickerDialog(
+                stacks = stacks,
+                boxes = boxes,
+                selected = state.query.filter.containerIds,
+                onToggle = viewModel::toggleContainer,
+                onDismiss = { openFacet = null },
+            )
         }
+    }
+
+    moveSheetEntry?.let { entryId ->
+        MoveToContainerSheet(
+            entryId = entryId,
+            stacks = stacks,
+            boxes = boxes,
+            onMove = { id, containerId -> viewModel.moveToContainer(id, containerId) },
+            onRemoveFromContainer = { id -> viewModel.removeFromContainer(id) },
+            onCreateContainer = { _, _ -> /* navigate to containers screen */ },
+            onDismiss = { moveSheetEntry = null },
+        )
     }
 }
 
@@ -231,10 +264,16 @@ private val LibrarySort.label: String
         LibrarySort.RECENTLY_ADDED -> "Recently added"
     }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun LibraryTile(entry: CollectionEntry, onClick: () -> Unit, onDismiss: (() -> Unit)? = null) {
+private fun LibraryTile(
+    entry: CollectionEntry,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onDismiss: (() -> Unit)? = null,
+) {
     val comic = entry.comic
-    Column(Modifier.clickable(enabled = comic != null, onClick = onClick)) {
+    Column(Modifier.combinedClickable(enabled = true, onClick = { if (comic != null) onClick() }, onLongClick = onLongClick)) {
         when {
             comic != null -> CoverImage(comic.coverA.imageUrl, contentDescription = comic.displayTitle)
             entry.isQueuedOnDevice -> PendingCover("Saved offline\n${entry.scannedCode}")
@@ -253,6 +292,9 @@ private fun LibraryTile(entry: CollectionEntry, onClick: () -> Unit, onDismiss: 
             entry.ownedCoverName?.let { Badge { Text("Variant") } }
             if (entry.copyCount > 1) Badge { Text("×${entry.copyCount}") }
         }
+        entry.containerName?.let { name ->
+            Badge(containerColor = MaterialTheme.colorScheme.secondaryContainer) { Text(name) }
+        }
         Text(
             comic?.series?.displayName ?: "Unknown",
             style = MaterialTheme.typography.bodyMedium,
@@ -261,6 +303,39 @@ private fun LibraryTile(entry: CollectionEntry, onClick: () -> Unit, onDismiss: 
             overflow = TextOverflow.Ellipsis,
         )
     }
+}
+
+@Composable
+private fun ContainerPickerDialog(
+    stacks: List<Container>,
+    boxes: List<Container>,
+    selected: Set<ContainerId>,
+    onToggle: (ContainerId) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val all = stacks + boxes
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        title = { Text("Filter by Container") },
+        text = {
+            androidx.compose.foundation.lazy.LazyColumn {
+                items(all.size) { index ->
+                    val container = all[index]
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onToggle(container.id) }.padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            (if (container.id in selected) "✓ " else "") + container.name,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text("${container.entryCount}", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+        },
+    )
 }
 
 @Composable

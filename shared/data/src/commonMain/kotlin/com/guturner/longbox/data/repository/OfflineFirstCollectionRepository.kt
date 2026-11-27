@@ -196,6 +196,12 @@ class OfflineFirstCollectionRepository(
             // Already gone on the server counts as done (DELETE is idempotent).
             if (result is Outcome.Failure && result.error != DomainError.NotFound) result else Outcome.Success(Unit)
         }
+
+        // Container changes are replayed by OfflineFirstContainerRepository; they don't belong
+        // in the collection outbox. Skip them so the when is exhaustive.
+        is PendingChange.CreateContainer,
+        is PendingChange.MoveToContainer,
+        is PendingChange.RemoveFromContainer -> Outcome.Success(Unit)
     }
 
     private fun merge(cached: CachedLibrary?, queued: Outbox): List<CollectionEntry> {
