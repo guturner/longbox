@@ -7,11 +7,16 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.MenuBar
@@ -98,7 +103,17 @@ fun main() {
                 }
             }
 
-            LongboxApp(graph, platform)
+            // Provide a fresh ViewModelStore each time graph changes (e.g. after URL save),
+            // so all viewModel { } calls in LongboxApp are recreated with the new graph.
+            val vmStore = remember(graph) { ViewModelStore() }
+            DisposableEffect(vmStore) { onDispose { vmStore.clear() } }
+            CompositionLocalProvider(
+                LocalViewModelStoreOwner provides object : ViewModelStoreOwner {
+                    override val viewModelStore get() = vmStore
+                }
+            ) {
+                LongboxApp(graph, platform)
+            }
 
             var updateRelease by remember { mutableStateOf<ReleaseInfo?>(null) }
             LaunchedEffect(Unit) {

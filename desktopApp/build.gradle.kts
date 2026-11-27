@@ -26,6 +26,7 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.swing)
                 implementation(libs.ktor.client.okhttp)
                 implementation(libs.java.keyring) // Windows Credential Manager
+                implementation(libs.lifecycle.viewmodel.compose)
             }
         }
     }
