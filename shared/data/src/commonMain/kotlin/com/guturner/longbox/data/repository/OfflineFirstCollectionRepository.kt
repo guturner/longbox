@@ -200,9 +200,16 @@ class OfflineFirstCollectionRepository(
 
     private fun merge(cached: CachedLibrary?, queued: Outbox): List<CollectionEntry> {
         val removed = queued.changes.filterIsInstance<PendingChange.RemoveEntry>().map { it.entryId }.toSet()
-        val server = cached?.entries.orEmpty().filter { it.id !in removed }.mapNotNull(ContractMapper::asEntry)
-        val local = queued.changes.filterIsInstance<PendingChange.AddScan>().map(::asLocalEntry)
-        return server + local
+        val server = cached?.entries.orEmpty().filter { it.id !in removed }
+            .mapNotNull(ContractMapper::asEntry).toMutableList()
+        val newLocal = mutableListOf<CollectionEntry>()
+        for (change in queued.changes.filterIsInstance<PendingChange.AddScan>()) {
+            val code = change.code + (change.addOn ?: "")
+            val idx = server.indexOfFirst { it.scannedCode == code }
+            if (idx >= 0) server[idx] = server[idx].copy(copyCount = server[idx].copyCount + 1)
+            else newLocal += asLocalEntry(change)
+        }
+        return server + newLocal
     }
 
     private fun asLocalEntry(change: PendingChange.AddScan) = CollectionEntry(

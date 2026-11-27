@@ -23,4 +23,5 @@ data class CollectionEntry(
     val addedAtEpochMillis: Long,
     /** Scanned while away from home and still waiting in the device outbox. */
     val isQueuedOnDevice: Boolean = false,
+    val copyCount: Int = 1,
 )

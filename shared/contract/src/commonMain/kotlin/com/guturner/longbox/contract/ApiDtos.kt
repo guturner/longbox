@@ -57,6 +57,7 @@ data class CollectionEntryDto(
     val comic: ComicDto? = null,
     val ownedCoverName: String? = null,
     val addedAtEpochMillis: Long,
+    val copyCount: Int = 1,
 )
 
 @Serializable

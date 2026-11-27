@@ -251,6 +251,7 @@ private fun LibraryTile(entry: CollectionEntry, onClick: () -> Unit, onDismiss: 
                 color = MaterialTheme.colorScheme.onSurface,
             )
             entry.ownedCoverName?.let { Badge { Text("Variant") } }
+            if (entry.copyCount > 1) Badge { Text("×${entry.copyCount}") }
         }
         Text(
             comic?.series?.displayName ?: "Unknown",

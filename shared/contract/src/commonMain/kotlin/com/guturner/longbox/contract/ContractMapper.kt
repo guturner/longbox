@@ -73,6 +73,7 @@ object ContractMapper {
         comic = entry.comic?.let(::asComicDto),
         ownedCoverName = entry.ownedCoverName,
         addedAtEpochMillis = entry.addedAtEpochMillis,
+        copyCount = entry.copyCount,
     )
 
     fun asEntry(dto: CollectionEntryDto): CollectionEntry? {
@@ -84,6 +85,7 @@ object ContractMapper {
             comic = dto.comic?.let(::asComic),
             ownedCoverName = dto.ownedCoverName,
             addedAtEpochMillis = dto.addedAtEpochMillis,
+            copyCount = dto.copyCount,
         )
     }
 

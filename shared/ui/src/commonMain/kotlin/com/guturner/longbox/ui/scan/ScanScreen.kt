@@ -28,6 +28,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.guturner.longbox.presentation.DuplicateScan
 import com.guturner.longbox.presentation.OwnershipCard
 import com.guturner.longbox.presentation.ScanMode
 import com.guturner.longbox.presentation.ScanViewModel
@@ -63,6 +64,10 @@ fun ScanScreen(viewModel: ScanViewModel, scanner: ScannerContent, onClose: () ->
             TextButton(onClick = onClose) { Text("Done") }
         }
     }
+
+    state.duplicatePending?.let { dup ->
+        DuplicateDialog(dup, onConfirm = viewModel::confirmAddCopy, onDismiss = viewModel::dismissDuplicate)
+    }
 }
 
 @Composable
@@ -89,6 +94,17 @@ fun OwnershipResult(card: OwnershipCard, onAdd: () -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun DuplicateDialog(dup: DuplicateScan, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Already in your library") },
+        text = { Text("You have ${dup.copyCount} cop${if (dup.copyCount == 1) "y" else "ies"} of \"${dup.displayTitle}\". Add another copy?") },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Add copy") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Skip") } },
+    )
 }
 
 /**
@@ -128,4 +144,8 @@ fun ManualEntryDialog(viewModel: ScanViewModel, onDismiss: () -> Unit) {
             }
         },
     )
+
+    state.duplicatePending?.let { dup ->
+        DuplicateDialog(dup, onConfirm = viewModel::confirmAddCopy, onDismiss = viewModel::dismissDuplicate)
+    }
 }

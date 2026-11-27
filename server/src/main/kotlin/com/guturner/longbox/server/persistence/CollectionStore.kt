@@ -24,7 +24,7 @@ class CollectionStore(
     suspend fun list(userId: UUID): List<CollectionEntry> = db.transaction {
         prepare(
             """
-            select e.id, e.scanned_code, e.status, e.owned_cover_name, e.added_at, i.payload::text as payload
+            select e.id, e.scanned_code, e.status, e.owned_cover_name, e.added_at, e.copy_count, i.payload::text as payload
             from collection_entry e left join catalog_issue i on i.id = e.issue_id
             where e.user_id = ?
             order by e.added_at
@@ -36,7 +36,7 @@ class CollectionStore(
     suspend fun find(userId: UUID, entryId: UUID): CollectionEntry? = db.transaction {
         prepare(
             """
-            select e.id, e.scanned_code, e.status, e.owned_cover_name, e.added_at, i.payload::text as payload
+            select e.id, e.scanned_code, e.status, e.owned_cover_name, e.added_at, e.copy_count, i.payload::text as payload
             from collection_entry e left join catalog_issue i on i.id = e.issue_id
             where e.user_id = ? and e.id = ?
             """.trimIndent(),
@@ -47,6 +47,7 @@ class CollectionStore(
     /**
      * Idempotent on (user, clientMutationId): a replayed offline scan returns the id of the entry
      * created the first time instead of inserting a duplicate.
+     * De-dupe on (user, scanned_code): re-scanning the same code increments copy_count on the existing row.
      */
     suspend fun insertPending(userId: UUID, code: String, addedAt: Instant, clientMutationId: String?): UUID = db.transaction {
         if (clientMutationId != null) {
@@ -54,12 +55,17 @@ class CollectionStore(
                 .querySingle { it.getObject("id", UUID::class.java) }
                 ?.let { return@transaction it }
         }
+        val existing = prepare("select id from collection_entry where user_id = ? and scanned_code = ?", userId, code)
+            .querySingle { it.getObject("id", UUID::class.java) }
+        if (existing != null) {
+            prepare("update collection_entry set copy_count = copy_count + 1 where id = ?", existing).update()
+            return@transaction existing
+        }
         val id = UUID.randomUUID()
         prepare(
             """
             insert into collection_entry (id, user_id, scanned_code, status, added_at, next_attempt_at, client_mutation_id)
             values (?, ?, ?, 'PENDING', ?, now(), ?)
-            on conflict do nothing
             """.trimIndent(),
             id, userId, code, addedAt, clientMutationId,
         ).update()
@@ -133,5 +139,6 @@ class CollectionStore(
         comic = rs.getString("payload")?.let { ContractMapper.asComic(json.decodeFromString(ComicDto.serializer(), it)) },
         ownedCoverName = rs.getString("owned_cover_name"),
         addedAtEpochMillis = rs.instant("added_at")!!.toEpochMilli(),
+        copyCount = rs.getInt("copy_count"),
     )
 }

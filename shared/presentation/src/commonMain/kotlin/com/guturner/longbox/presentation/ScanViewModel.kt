@@ -23,6 +23,8 @@ enum class ScanMode {
 
 data class OwnershipCard(val title: String, val detail: String, val owned: Boolean, val barcode: ComicBarcode?)
 
+data class DuplicateScan(val displayTitle: String, val copyCount: Int, val mainCode: String, val addOn: String?)
+
 data class ScanUiState(
     val mode: ScanMode = ScanMode.ADD,
     /** Most recent first; shown under the viewfinder so you can see the box going in. */
@@ -30,6 +32,7 @@ data class ScanUiState(
     val sessionCount: Int = 0,
     /** Result of the last CHECK-mode scan. */
     val ownership: OwnershipCard? = null,
+    val duplicatePending: DuplicateScan? = null,
 )
 
 data class ScanFeedback(val code: String, val message: UiMessage)
@@ -82,7 +85,40 @@ class ScanViewModel(
         }
     }
 
+    fun confirmAddCopy() {
+        val pending = mutableState.value.duplicatePending ?: return
+        mutableState.update { it.copy(duplicatePending = null) }
+        viewModelScope.launch {
+            val key = pending.mainCode + (pending.addOn ?: "")
+            val feedback = when (val result = scanComic(pending.mainCode, pending.addOn)) {
+                is Outcome.Success -> {
+                    mutableState.update { it.copy(sessionCount = it.sessionCount + 1) }
+                    val where = if (result.value.isQueuedOnDevice) "saved on this device until you're home" else "looking it up…"
+                    ScanFeedback(key, UiMessage("Added another copy — $where", isError = false))
+                }
+                is Outcome.Failure -> ScanFeedback(key, result.error.toUiMessage())
+            }
+            mutableState.update { it.copy(recent = (listOf(feedback) + it.recent).take(MAX_RECENT)) }
+        }
+    }
+
+    fun dismissDuplicate() = mutableState.update { it.copy(duplicatePending = null) }
+
     private suspend fun add(key: String, mainCode: String, addOn: String?) {
+        val ownership = checkOwnership(mainCode, addOn)
+        if (ownership is Ownership.Owned) {
+            val comic = ownership.copies.firstNotNullOfOrNull { it.comic }
+            val copyCount = ownership.copies.firstOrNull()?.copyCount ?: 1
+            mutableState.update {
+                it.copy(duplicatePending = DuplicateScan(
+                    displayTitle = comic?.displayTitle ?: formatCode(key),
+                    copyCount = copyCount,
+                    mainCode = mainCode,
+                    addOn = addOn,
+                ))
+            }
+            return
+        }
         val feedback = when (val result = scanComic(mainCode, addOn)) {
             is Outcome.Success -> {
                 mutableState.update { it.copy(sessionCount = it.sessionCount + 1) }
@@ -104,7 +140,7 @@ class ScanViewModel(
                 OwnershipCard(
                     title = "You own this",
                     detail = (comic?.displayTitle ?: formatCode(key)) +
-                        if (result.copies.size > 1) " · ${result.copies.size} copies" else "",
+                        if ((result.copies.firstOrNull()?.copyCount ?: 1) > 1) " · ${result.copies.first().copyCount} copies" else "",
                     owned = true,
                     barcode = null,
                 )
