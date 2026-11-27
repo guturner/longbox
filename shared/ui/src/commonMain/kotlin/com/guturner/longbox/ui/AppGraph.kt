@@ -7,8 +7,10 @@ import com.guturner.longbox.data.repository.ApiComicCatalog
 import com.guturner.longbox.data.repository.ApiSessionRepository
 import com.guturner.longbox.data.repository.KeyValueStorePullListRepository
 import com.guturner.longbox.data.repository.OfflineFirstCollectionRepository
+import com.guturner.longbox.data.repository.OfflineFirstContainerRepository
 import com.guturner.longbox.data.session.SessionTransport
 import com.guturner.longbox.domain.repository.Clock
+import com.guturner.longbox.domain.repository.ContainerRepository
 import com.guturner.longbox.domain.repository.PullListRepository
 import com.guturner.longbox.domain.repository.SyncController
 import com.guturner.longbox.domain.usecase.CheckOwnershipUseCase
@@ -62,6 +64,7 @@ class AppGraph(
     private val offlineFirst = OfflineFirstCollectionRepository(api, localStore, appScope, nowMillis)
     val collectionRepository = offlineFirst
     val sync: SyncController = offlineFirst
+    val containerRepository: ContainerRepository = OfflineFirstContainerRepository(api, localStore, appScope, nowMillis)
     val catalog = ApiComicCatalog(api, offlineFirst)
     val sessionRepository = ApiSessionRepository(api, transport)
 
