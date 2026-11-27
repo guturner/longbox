@@ -44,9 +44,15 @@ class CollectionService(
         val addedAt = scannedAtEpochMillis?.let(Instant::ofEpochMilli)
             ?.takeIf { it.isBefore(now().plusSeconds(300)) && it.isAfter(now().minus(Duration.ofDays(365))) }
             ?: now()
-        val id = store.insertPending(userId, barcode.fullCode, addedAt, clientMutationId)
-        events.publish(EntryEvent.Scanned(id, now(), barcode.fullCode))
-        worker.wakeUp()
+        val (id, isCopyIncrement) = store.insertPending(userId, barcode.fullCode, addedAt, clientMutationId)
+        if (isCopyIncrement) {
+            val entry = store.find(userId, id)
+            val newCopyCount = entry?.copyCount ?: 1
+            events.publish(EntryEvent.CopyRescanned(id, now(), newCopyCount))
+        } else {
+            events.publish(EntryEvent.Scanned(id, now(), barcode.fullCode))
+            worker.wakeUp()
+        }
         return store.find(userId, id)?.let { Outcome.Success(it) } ?: Outcome.Failure(DomainError.Unexpected("insert failed"))
     }
 

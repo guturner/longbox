@@ -25,11 +25,20 @@ class CollectionServiceTest {
     /** Minimal in-memory CollectionStore — only the operations CollectionService touches. */
     private class FakeStore : CollectionStore {
         val rows = mutableMapOf<UUID, CollectionEntry>()
+        // Track scanned codes to simulate copy-count de-dupe.
+        private val codeToId = mutableMapOf<String, UUID>()
 
-        override suspend fun insertPending(userId: UUID, code: String, addedAt: Instant, clientMutationId: String?): UUID {
+        override suspend fun insertPending(userId: UUID, code: String, addedAt: Instant, clientMutationId: String?): Pair<UUID, Boolean> {
+            val existing = codeToId[code]
+            if (existing != null) {
+                val entry = rows[existing]!!
+                rows[existing] = entry.copy(copyCount = entry.copyCount + 1)
+                return existing to true
+            }
             val id = UUID.randomUUID()
             rows[id] = CollectionEntry(EntryId(id.toString()), code, EntryState.PENDING, null, null, addedAt.toEpochMilli())
-            return id
+            codeToId[code] = id
+            return id to false
         }
 
         override suspend fun find(userId: UUID, entryId: UUID): CollectionEntry? = rows[entryId]
@@ -69,7 +78,7 @@ class CollectionServiceTest {
         val service = buildService(store, events)
 
         // Insert an entry directly so we have an ID to remove.
-        val entryId = store.insertPending(userId, "75960609558200111", Instant.EPOCH, null)
+        val (entryId, _) = store.insertPending(userId, "75960609558200111", Instant.EPOCH, null)
         events.recorded.clear() // ignore the insert; we're testing remove
 
         val result = service.remove(userId, entryId.toString())
@@ -78,5 +87,24 @@ class CollectionServiceTest {
         assertEquals(1, events.recorded.size)
         val event = assertIs<EntryEvent.Removed>(events.recorded[0])
         assertEquals(entryId, event.entryId)
+    }
+
+    @Test
+    fun testDuplicateScanPublishesCopyRescannedEvent() = runTest {
+        val events = RecordingEventPublisher()
+        val store = FakeStore()
+        val service = buildService(store, events)
+
+        // First scan: new entry.
+        service.addScan(userId, "759606095582", "00111")
+        events.recorded.clear()
+
+        // Second scan of the same code: should fire CopyRescanned, not Scanned.
+        val result = service.addScan(userId, "759606095582", "00111")
+
+        assertIs<Outcome.Success<*>>(result)
+        assertEquals(1, events.recorded.size)
+        val event = assertIs<EntryEvent.CopyRescanned>(events.recorded[0])
+        assertEquals(2, event.newCopyCount)
     }
 }

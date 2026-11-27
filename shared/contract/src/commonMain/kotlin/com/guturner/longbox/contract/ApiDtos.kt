@@ -50,6 +50,27 @@ data class ComicDto(
 )
 
 @Serializable
+data class ContainerDto(
+    val id: String,
+    val name: String,
+    val kind: String,
+    val entryCount: Int,
+    val createdAtEpochMillis: Long,
+)
+
+@Serializable
+data class ContainerListResponse(val containers: List<ContainerDto>)
+
+@Serializable
+data class CreateContainerRequest(val name: String, val kind: String, val clientMutationId: String? = null)
+
+@Serializable
+data class RenameContainerRequest(val name: String)
+
+@Serializable
+data class MoveToContainerRequest(val entryId: String)
+
+@Serializable
 data class CollectionEntryDto(
     val id: String,
     val scannedCode: String,
@@ -58,6 +79,8 @@ data class CollectionEntryDto(
     val ownedCoverName: String? = null,
     val addedAtEpochMillis: Long,
     val copyCount: Int = 1,
+    val containerId: String? = null,
+    val containerName: String? = null,
 )
 
 @Serializable

@@ -4,6 +4,7 @@ import com.guturner.longbox.contract.CSRF_HEADER
 import com.guturner.longbox.contract.ErrorDto
 import com.guturner.longbox.domain.usecase.ResolveBarcodeUseCase
 import com.guturner.longbox.server.api.collectionRoutes
+import com.guturner.longbox.server.api.containerRoutes
 import com.guturner.longbox.server.api.configureSecurity
 import com.guturner.longbox.server.api.authRoutes
 import com.guturner.longbox.server.api.imageProxyRoutes
@@ -11,13 +12,15 @@ import com.guturner.longbox.server.auth.GoogleApiIdentityVerifier
 import com.guturner.longbox.server.auth.TokenService
 import com.guturner.longbox.server.catalog.CachedMetronCatalog
 import com.guturner.longbox.server.collection.CollectionService
+import com.guturner.longbox.server.collection.ContainerService
 import com.guturner.longbox.server.collection.ScanWorker
 import com.guturner.longbox.server.config.AppConfig
 import com.guturner.longbox.server.metron.MetronClient
 import com.guturner.longbox.server.metron.MetronRateLimiter
-import com.guturner.longbox.server.events.SharedFlowEntryEventBus
+import com.guturner.longbox.server.events.AppEventBus
 import com.guturner.longbox.server.persistence.AuthStore
 import com.guturner.longbox.server.persistence.JdbcCollectionStore
+import com.guturner.longbox.server.persistence.JdbcContainerStore
 import com.guturner.longbox.server.persistence.Database
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -76,9 +79,11 @@ fun Application.module(config: AppConfig) {
     val authStore = AuthStore(db)
     val tokens = TokenService(authStore, GoogleApiIdentityVerifier(config.auth.googleClientIds), config.auth)
     val collectionStore = JdbcCollectionStore(db)
-    val eventBus = SharedFlowEntryEventBus()
+    val containerStore = JdbcContainerStore(db)
+    val eventBus = AppEventBus()
     val worker = ScanWorker(collectionStore, ResolveBarcodeUseCase(catalog), eventBus)
     val collection = CollectionService(collectionStore, worker, eventBus)
+    val containerService = ContainerService(containerStore, eventBus, eventBus)
 
     val imageClient = HttpClient(OkHttp) {
         followRedirects = false // a redirect could point the proxy at an internal host
@@ -143,6 +148,7 @@ fun Application.module(config: AppConfig) {
         }
         authRoutes(tokens, authStore)
         collectionRoutes(collection, catalog)
+        containerRoutes(containerService)
         imageProxyRoutes(imageClient, allowedHosts = IMAGE_HOSTS)
 
         // Serve the built Compose/Wasm web app from the same origin, so cookies can be SameSite=Strict.

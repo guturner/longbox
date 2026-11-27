@@ -3,6 +3,7 @@ package com.guturner.longbox.server.persistence
 import com.guturner.longbox.contract.ComicDto
 import com.guturner.longbox.contract.ContractMapper
 import com.guturner.longbox.domain.model.CollectionEntry
+import com.guturner.longbox.domain.model.ContainerId
 import com.guturner.longbox.domain.model.EntryId
 import com.guturner.longbox.domain.model.EntryState
 import kotlinx.serialization.json.Json
@@ -15,7 +16,11 @@ data class QueuedScan(val entryId: UUID, val code: String, val attempts: Int, va
 interface CollectionStore {
     suspend fun list(userId: UUID): List<CollectionEntry>
     suspend fun find(userId: UUID, entryId: UUID): CollectionEntry?
-    suspend fun insertPending(userId: UUID, code: String, addedAt: Instant, clientMutationId: String?): UUID
+    /**
+     * Returns (entryId, isCopyIncrement). isCopyIncrement is true when the same code was
+     * already in the collection and the copy_count was bumped rather than a new row inserted.
+     */
+    suspend fun insertPending(userId: UUID, code: String, addedAt: Instant, clientMutationId: String?): Pair<UUID, Boolean>
     suspend fun ping(): Boolean
     suspend fun delete(userId: UUID, entryId: UUID): Boolean
     suspend fun countToday(userId: UUID, since: Instant): Int
@@ -37,8 +42,11 @@ class JdbcCollectionStore(
     override suspend fun list(userId: UUID): List<CollectionEntry> = db.transaction {
         prepare(
             """
-            select e.id, e.scanned_code, e.status, e.owned_cover_name, e.added_at, e.copy_count, i.payload::text as payload
-            from collection_entry e left join catalog_issue i on i.id = e.issue_id
+            select e.id, e.scanned_code, e.status, e.owned_cover_name, e.added_at, e.copy_count,
+                   e.container_id, c.name as container_name, i.payload::text as payload
+            from collection_entry e
+            left join catalog_issue i on i.id = e.issue_id
+            left join container c on c.id = e.container_id
             where e.user_id = ?
             order by e.added_at
             """.trimIndent(),
@@ -49,8 +57,11 @@ class JdbcCollectionStore(
     override suspend fun find(userId: UUID, entryId: UUID): CollectionEntry? = db.transaction {
         prepare(
             """
-            select e.id, e.scanned_code, e.status, e.owned_cover_name, e.added_at, e.copy_count, i.payload::text as payload
-            from collection_entry e left join catalog_issue i on i.id = e.issue_id
+            select e.id, e.scanned_code, e.status, e.owned_cover_name, e.added_at, e.copy_count,
+                   e.container_id, c.name as container_name, i.payload::text as payload
+            from collection_entry e
+            left join catalog_issue i on i.id = e.issue_id
+            left join container c on c.id = e.container_id
             where e.user_id = ? and e.id = ?
             """.trimIndent(),
             userId, entryId,
@@ -61,18 +72,19 @@ class JdbcCollectionStore(
      * Idempotent on (user, clientMutationId): a replayed offline scan returns the id of the entry
      * created the first time instead of inserting a duplicate.
      * De-dupe on (user, scanned_code): re-scanning the same code increments copy_count on the existing row.
+     * Returns (entryId, isCopyIncrement).
      */
-    override suspend fun insertPending(userId: UUID, code: String, addedAt: Instant, clientMutationId: String?): UUID = db.transaction {
+    override suspend fun insertPending(userId: UUID, code: String, addedAt: Instant, clientMutationId: String?): Pair<UUID, Boolean> = db.transaction {
         if (clientMutationId != null) {
             prepare("select id from collection_entry where user_id = ? and client_mutation_id = ?", userId, clientMutationId)
                 .querySingle { it.getObject("id", UUID::class.java) }
-                ?.let { return@transaction it }
+                ?.let { return@transaction it to false }
         }
         val existing = prepare("select id from collection_entry where user_id = ? and scanned_code = ?", userId, code)
             .querySingle { it.getObject("id", UUID::class.java) }
         if (existing != null) {
             prepare("update collection_entry set copy_count = copy_count + 1 where id = ?", existing).update()
-            return@transaction existing
+            return@transaction existing to true
         }
         val id = UUID.randomUUID()
         prepare(
@@ -82,7 +94,7 @@ class JdbcCollectionStore(
             """.trimIndent(),
             id, userId, code, addedAt, clientMutationId,
         ).update()
-        id
+        id to false
     }
 
     override suspend fun ping(): Boolean = runCatching {
@@ -153,5 +165,7 @@ class JdbcCollectionStore(
         ownedCoverName = rs.getString("owned_cover_name"),
         addedAtEpochMillis = rs.instant("added_at")!!.toEpochMilli(),
         copyCount = rs.getInt("copy_count"),
+        containerId = rs.getString("container_id")?.let { ContainerId(it) },
+        containerName = rs.getString("container_name"),
     )
 }

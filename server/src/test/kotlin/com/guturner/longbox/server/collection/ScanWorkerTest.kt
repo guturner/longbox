@@ -32,7 +32,7 @@ class ScanWorkerTest {
     private class FakeStore : CollectionStore {
         override suspend fun list(userId: UUID): List<CollectionEntry> = emptyList()
         override suspend fun find(userId: UUID, entryId: UUID): CollectionEntry? = null
-        override suspend fun insertPending(userId: UUID, code: String, addedAt: Instant, clientMutationId: String?): UUID = UUID.randomUUID()
+        override suspend fun insertPending(userId: UUID, code: String, addedAt: Instant, clientMutationId: String?): Pair<UUID, Boolean> = UUID.randomUUID() to false
         override suspend fun ping(): Boolean = true
         override suspend fun delete(userId: UUID, entryId: UUID): Boolean = false
         override suspend fun countToday(userId: UUID, since: Instant): Int = 0

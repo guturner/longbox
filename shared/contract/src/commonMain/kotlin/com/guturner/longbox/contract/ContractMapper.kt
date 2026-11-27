@@ -4,6 +4,9 @@ import com.guturner.longbox.domain.model.CalendarDate
 import com.guturner.longbox.domain.model.CollectionEntry
 import com.guturner.longbox.domain.model.Comic
 import com.guturner.longbox.domain.model.ComicId
+import com.guturner.longbox.domain.model.Container
+import com.guturner.longbox.domain.model.ContainerId
+import com.guturner.longbox.domain.model.ContainerKind
 import com.guturner.longbox.domain.model.Cover
 import com.guturner.longbox.domain.model.Creator
 import com.guturner.longbox.domain.model.CreatorId
@@ -66,6 +69,25 @@ object ContractMapper {
         upc = dto.upc,
     )
 
+    fun asContainerDto(container: Container): ContainerDto = ContainerDto(
+        id = container.id.value,
+        name = container.name,
+        kind = container.kind.name,
+        entryCount = container.entryCount,
+        createdAtEpochMillis = container.createdAtEpochMillis,
+    )
+
+    fun asContainer(dto: ContainerDto): Container? {
+        val kind = ContainerKind.entries.firstOrNull { it.name == dto.kind } ?: return null
+        return Container(
+            id = ContainerId(dto.id),
+            name = dto.name,
+            kind = kind,
+            entryCount = dto.entryCount,
+            createdAtEpochMillis = dto.createdAtEpochMillis,
+        )
+    }
+
     fun asEntryDto(entry: CollectionEntry): CollectionEntryDto = CollectionEntryDto(
         id = entry.id.value,
         scannedCode = entry.scannedCode,
@@ -74,6 +96,8 @@ object ContractMapper {
         ownedCoverName = entry.ownedCoverName,
         addedAtEpochMillis = entry.addedAtEpochMillis,
         copyCount = entry.copyCount,
+        containerId = entry.containerId?.value,
+        containerName = entry.containerName,
     )
 
     fun asEntry(dto: CollectionEntryDto): CollectionEntry? {
@@ -95,6 +119,8 @@ object ContractMapper {
             ownedCoverName = dto.ownedCoverName,
             addedAtEpochMillis = dto.addedAtEpochMillis,
             copyCount = dto.copyCount,
+            containerId = dto.containerId?.let(::ContainerId),
+            containerName = dto.containerName,
         )
     }
 
