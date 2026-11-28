@@ -18,8 +18,14 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.MenuBar
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
+import java.awt.Color
+import java.awt.image.BufferedImage
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -64,6 +70,14 @@ fun main() {
             return GoogleLoopbackSignIn(cfg.googleClientId, cfg.googleClientSecret).requestIdToken()
         }
         override val scanner: ScannerContent? = null // use a USB scanner as a keyboard on desktop
+        override fun generateQrCode(content: String, sizePx: Int): ImageBitmap? = runCatching {
+            val bits = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, sizePx, sizePx)
+            val img = BufferedImage(sizePx, sizePx, BufferedImage.TYPE_INT_RGB)
+            for (x in 0 until sizePx) for (y in 0 until sizePx) {
+                img.setRGB(x, y, if (bits[x, y]) Color.BLACK.rgb else Color.WHITE.rgb)
+            }
+            img.toComposeImageBitmap()
+        }.getOrNull()
     }
 
     application {

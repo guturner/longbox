@@ -2,6 +2,7 @@ package com.guturner.longbox.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.ImageBitmap
 
 /** What each app shell provides that the shared UI can't do itself. */
 interface PlatformServices {
@@ -13,6 +14,12 @@ interface PlatformServices {
 
     /** Rewrites catalog image URLs; the web client routes them through the server's image proxy. */
     fun imageUrl(original: String): String = original
+
+    /**
+     * Renders [content] as a QR code and returns it as an [ImageBitmap] of [sizePx]×[sizePx].
+     * Returns null on platforms without a QR generator (e.g. web).
+     */
+    fun generateQrCode(content: String, sizePx: Int): ImageBitmap? = null
 }
 
 interface ScannerContent {

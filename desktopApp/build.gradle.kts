@@ -27,6 +27,7 @@ kotlin {
                 implementation(libs.ktor.client.okhttp)
                 implementation(libs.java.keyring) // Windows Credential Manager
                 implementation(libs.lifecycle.viewmodel.compose)
+                implementation(libs.zxing.core) // QR code generation for container labels
             }
         }
     }

@@ -2,6 +2,7 @@ package com.guturner.longbox.ui.containers
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -54,6 +55,7 @@ import com.guturner.longbox.domain.model.Container
 import com.guturner.longbox.domain.model.ContainerId
 import com.guturner.longbox.domain.model.ContainerKind
 import com.guturner.longbox.presentation.ContainersViewModel
+import com.guturner.longbox.ui.LocalPlatform
 import com.guturner.longbox.ui.components.RainbowStripe
 import com.guturner.longbox.ui.rainbowFor
 import longbox.shared.ui.generated.resources.Res
@@ -75,6 +77,7 @@ fun ContainersScreen(
     val snackbar = remember { SnackbarHostState() }
     var showCreate by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<Container?>(null) }
+    var labelTarget by remember { mutableStateOf<Container?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.message) {
@@ -150,6 +153,7 @@ fun ContainersScreen(
                             tileColor = rainbowFor(index),
                             onClick = { onFilterByContainer(container) },
                             onRename = { renameTarget = container },
+                            onLabel = { labelTarget = container },
                             onDelete = { viewModel.deleteContainer(container.id) },
                         )
                     }
@@ -172,6 +176,10 @@ fun ContainersScreen(
             onDismiss = { renameTarget = null },
         )
     }
+
+    labelTarget?.let { target ->
+        ContainerLabelDialog(container = target, onDismiss = { labelTarget = null })
+    }
 }
 
 @Composable
@@ -180,6 +188,7 @@ private fun ContainerTile(
     tileColor: Color,
     onClick: () -> Unit,
     onRename: () -> Unit,
+    onLabel: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Surface(
@@ -221,6 +230,9 @@ private fun ContainerTile(
             ) { Text("${container.entryCount}") }
             TextButton(onClick = onRename) {
                 Text("Rename", color = Color.White.copy(alpha = 0.85f))
+            }
+            TextButton(onClick = onLabel) {
+                Text("Label", color = Color.White.copy(alpha = 0.85f))
             }
             TextButton(onClick = onDelete) {
                 Text("Remove", color = Color.White.copy(alpha = 0.85f))
@@ -281,6 +293,50 @@ internal fun CreateContainerDialog(onCreate: (String, ContainerKind) -> Unit, on
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** Shows a printable QR code label for [container]. The QR encodes a deep-link URL the user can
+ *  scan to open the container directly in Longbox on another device or after a cold reinstall. */
+@Composable
+private fun ContainerLabelDialog(container: Container, onDismiss: () -> Unit) {
+    val platform = LocalPlatform.current
+    val deepLink = "longbox://containers/${container.id.value}"
+    val qr: ImageBitmap? = remember(deepLink) { platform.generateQrCode(deepLink, 512) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(container.name) },
+        text = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (qr != null) {
+                    Image(
+                        bitmap = qr,
+                        contentDescription = "QR code for ${container.name}",
+                        modifier = Modifier.size(220.dp),
+                    )
+                } else {
+                    Text(
+                        "QR codes are not available on this platform.\nUse the app to navigate to this container.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    "${kindLabel(container.kind)} · ${container.entryCount} comics",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "Scan to open this container in Longbox",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
     )
 }
 

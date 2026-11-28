@@ -1,11 +1,14 @@
 package com.guturner.longbox.android
 
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
@@ -13,6 +16,8 @@ import androidx.credentials.exceptions.GetCredentialException
 import androidx.lifecycle.lifecycleScope
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 import com.guturner.longbox.ui.LongboxApp
 import com.guturner.longbox.ui.PlatformServices
 import com.guturner.longbox.ui.ScannerContent
@@ -31,6 +36,14 @@ class MainActivity : ComponentActivity() {
         val platform = object : PlatformServices {
             override suspend fun requestGoogleIdToken(): String? = signInWithGoogle()
             override val scanner: ScannerContent = CameraBarcodeScanner
+            override fun generateQrCode(content: String, sizePx: Int): ImageBitmap? = runCatching {
+                val bits = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, sizePx, sizePx)
+                val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+                for (x in 0 until sizePx) for (y in 0 until sizePx) {
+                    bmp.setPixel(x, y, if (bits[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+                }
+                bmp.asImageBitmap()
+            }.getOrNull()
         }
         setContent { LongboxApp(app.graph, platform) }
     }
