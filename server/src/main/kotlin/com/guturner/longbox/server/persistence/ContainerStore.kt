@@ -100,7 +100,7 @@ class JdbcContainerStore(
 
         val kind = prepare("select kind from container where id = ?", containerId)
             .querySingle { it.getString("kind") } ?: return@transaction null
-        val newStatus = if (kind == "BOX") "IN_BOX" else "IN_STACK"
+        val newStatus = if (kind == "STACK") "IN_STACK" else "IN_BOX"
 
         val updated = prepare(
             "update collection_entry set container_id = ?, status = ? where id = ? and user_id = ?",

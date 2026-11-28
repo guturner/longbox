@@ -33,15 +33,19 @@ import com.guturner.longbox.domain.model.EntryId
 @Composable
 fun MoveToContainerSheet(
     entryId: EntryId,
-    stacks: List<Container>,
-    boxes: List<Container>,
+    containers: List<Container>,
     onMove: (EntryId, ContainerId) -> Unit,
     onRemoveFromContainer: (EntryId) -> Unit,
-    onCreateContainer: (String, ContainerKind) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showCreate by remember { mutableStateOf(false) }
+
+    val groups = listOf(
+        "Stacks" to containers.filter { it.kind == ContainerKind.STACK },
+        "Short Boxes" to containers.filter { it.kind == ContainerKind.SHORT_BOX },
+        "Long Boxes" to containers.filter { it.kind == ContainerKind.LONG_BOX },
+    ).filter { (_, list) -> list.isNotEmpty() }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(Modifier.padding(bottom = 32.dp)) {
@@ -52,29 +56,15 @@ fun MoveToContainerSheet(
             )
             HorizontalDivider()
 
-            if (stacks.isNotEmpty()) {
+            groups.forEach { (header, list) ->
                 Text(
-                    "STACKS",
+                    header.uppercase(),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
                 LazyColumn(Modifier.fillMaxWidth()) {
-                    items(stacks, key = { it.id.value }) { container ->
-                        ContainerPickerRow(container, onClick = { onMove(entryId, container.id); onDismiss() })
-                    }
-                }
-            }
-
-            if (boxes.isNotEmpty()) {
-                Text(
-                    "BOXES",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-                LazyColumn(Modifier.fillMaxWidth()) {
-                    items(boxes, key = { it.id.value }) { container ->
+                    items(list, key = { it.id.value }) { container ->
                         ContainerPickerRow(container, onClick = { onMove(entryId, container.id); onDismiss() })
                     }
                 }
@@ -95,10 +85,7 @@ fun MoveToContainerSheet(
 
     if (showCreate) {
         CreateContainerDialog(
-            onCreate = { name, kind ->
-                onCreateContainer(name, kind)
-                showCreate = false
-            },
+            onCreate = { _, _ -> showCreate = false }, // navigate to containers to create
             onDismiss = { showCreate = false },
         )
     }
@@ -114,8 +101,11 @@ private fun ContainerPickerRow(container: Container, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(container.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        Text("${container.entryCount}", style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "${container.entryCount}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
     HorizontalDivider()
 }

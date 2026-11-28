@@ -13,10 +13,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.guturner.longbox.domain.library.LibraryFilter
 import com.guturner.longbox.domain.model.ComicId
-import com.guturner.longbox.domain.model.ContainerId
+import com.guturner.longbox.domain.model.Container
 import com.guturner.longbox.domain.model.CreatorId
 import com.guturner.longbox.domain.model.PullListEntry
 import com.guturner.longbox.domain.model.StoryArcId
@@ -81,6 +80,7 @@ private fun SignedInApp(
     onThemeModeChange: (ThemeMode) -> Unit,
 ) {
     val nav = rememberNavController()
+    // "Go home" means back to the library list (used by deep screens like Creator/StoryArc).
     val goHome: () -> Unit = { nav.popBackStack(LibraryRoute, inclusive = false) }
     // Activity/window-scoped so filters survive navigating into details and back.
     val library = viewModel {
@@ -91,26 +91,37 @@ private fun SignedInApp(
     val pullListVm = viewModel { PullListViewModel(graph.pullList, graph.collectionRepository, graph.getWeeklyReleases, graph.clock) }
     val manualScan = viewModel(key = "manual-scan") { ScanViewModel(graph.scanComic, graph.checkOwnership, graph.nowMillis) }
     var showManualEntry by remember { mutableStateOf(false) }
+    var activeContainer by remember { mutableStateOf<Container?>(null) }
     val coverSize by graph.coverSize.collectAsStateWithLifecycle()
 
-    NavHost(nav, startDestination = LibraryRoute) {
+    NavHost(nav, startDestination = ContainersRoute) {
+        composable<ContainersRoute> {
+            ContainersScreen(
+                viewModel = containersVm,
+                onFilterByContainer = { container ->
+                    activeContainer = container
+                    library.showOnly(LibraryFilter(containerIds = setOf(container.id)))
+                    nav.navigate(LibraryRoute)
+                },
+            )
+        }
         composable<LibraryRoute> {
             LibraryScreen(
                 viewModel = library,
+                activeContainer = activeContainer,
+                onBack = { nav.popBackStack() },
                 onOpenComic = { nav.navigate(ComicRoute(it.value)) },
                 onScan = platform.scanner?.let { { nav.navigate(ScanRoute(check = false)) } },
                 onCheckInShop = platform.scanner?.let { { nav.navigate(ScanRoute(check = true)) } },
                 onAddManually = { showManualEntry = true },
                 onOpenReleases = { nav.navigate(ReleasesRoute) },
                 onOpenPullList = { nav.navigate(PullListRoute) },
-                onOpenContainers = { nav.navigate(ContainersRoute) },
                 onSignOut = onSignOut,
                 coverSize = coverSize,
                 onCoverSizeChange = graph::setCoverSize,
                 themeMode = themeMode,
                 onThemeModeChange = onThemeModeChange,
-                stacks = containersState.stacks,
-                boxes = containersState.boxes,
+                containers = containersState.containers,
             )
         }
         composable<ComicRoute> { entry ->
@@ -123,6 +134,9 @@ private fun SignedInApp(
                 onOpenStoryArc = { nav.navigate(StoryArcRoute(it.id.value)) },
                 onRemoveCopy = library::remove,
                 onAddSeriesToPullList = pullListVm::addSeries,
+                containers = containersState.containers,
+                onMoveToContainer = library::moveToContainer,
+                onRemoveFromContainer = library::removeFromContainer,
             )
         }
         composable<CreatorRoute> { entry ->
@@ -158,16 +172,6 @@ private fun SignedInApp(
                 ScanViewModel(graph.scanComic, graph.checkOwnership, graph.nowMillis, if (check) ScanMode.CHECK else ScanMode.ADD)
             }
             ScanScreen(vm, scanner, onClose = { nav.popBackStack() })
-        }
-        composable<ContainersRoute> {
-            ContainersScreen(
-                viewModel = containersVm,
-                onGoHome = goHome,
-                onFilterByContainer = { containerId ->
-                    library.showOnly(LibraryFilter(containerIds = setOf(containerId)))
-                    goHome()
-                },
-            )
         }
     }
 

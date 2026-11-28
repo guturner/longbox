@@ -16,11 +16,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class ContainersState(
-    val stacks: List<Container> = emptyList(),
-    val boxes: List<Container> = emptyList(),
+    val containers: List<Container> = emptyList(),
     val isLoading: Boolean = false,
     val message: UiMessage? = null,
-)
+) {
+    val stacks: List<Container> get() = containers.filter { it.kind == ContainerKind.STACK }
+    val shortBoxes: List<Container> get() = containers.filter { it.kind == ContainerKind.SHORT_BOX }
+    val longBoxes: List<Container> get() = containers.filter { it.kind == ContainerKind.LONG_BOX }
+}
 
 class ContainersViewModel(
     private val containers: ContainerRepository,
@@ -32,8 +35,7 @@ class ContainersViewModel(
     val state: StateFlow<ContainersState> =
         combine(containers.observeContainers(), transient) { list, t ->
             ContainersState(
-                stacks = list.filter { it.kind == ContainerKind.STACK },
-                boxes = list.filter { it.kind == ContainerKind.BOX },
+                containers = list.sortedBy { it.createdAtEpochMillis },
                 isLoading = t.isLoading,
                 message = t.message,
             )

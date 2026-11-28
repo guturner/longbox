@@ -3,8 +3,11 @@ package com.guturner.longbox.ui.components
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,9 +21,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.guturner.longbox.ui.LocalPlatform
+import com.guturner.longbox.ui.LongboxRainbow
 import com.guturner.longbox.ui.rainbowFor
 import longbox.shared.ui.generated.resources.Res
 import longbox.shared.ui.generated.resources.longbox_logo
@@ -95,6 +100,19 @@ fun HomeIconButton(onClick: () -> Unit) {
             contentDescription = "Home",
             modifier = Modifier.size(32.dp),
         )
+    }
+}
+
+/**
+ * Horizontal 7-stripe rainbow bar using the Longbox palette.
+ * Place below any TopAppBar for the consistent 80s Digital Collector header accent.
+ */
+@Composable
+fun RainbowStripe(height: Dp = 6.dp, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth().height(height)) {
+        LongboxRainbow.forEach { color ->
+            Box(Modifier.weight(1f).fillMaxSize().background(color))
+        }
     }
 }
 

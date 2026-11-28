@@ -24,11 +24,17 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.guturner.longbox.domain.model.Comic
+import com.guturner.longbox.domain.model.Container
+import com.guturner.longbox.domain.model.ContainerId
 import com.guturner.longbox.domain.model.CreatorId
 import com.guturner.longbox.domain.model.CreatorRole
 import com.guturner.longbox.domain.model.EntryId
@@ -40,6 +46,8 @@ import com.guturner.longbox.ui.components.CenteredMessage
 import com.guturner.longbox.ui.components.CoverImage
 import com.guturner.longbox.ui.components.HomeIconButton
 import com.guturner.longbox.ui.components.MetronAttribution
+import com.guturner.longbox.ui.components.RainbowStripe
+import com.guturner.longbox.ui.containers.MoveToContainerSheet
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -50,16 +58,23 @@ fun ComicDetailScreen(
     onOpenStoryArc: (StoryArcRef) -> Unit,
     onRemoveCopy: (EntryId) -> Unit,
     onAddSeriesToPullList: (PullListEntry.BySeries) -> Unit = {},
+    containers: List<Container> = emptyList(),
+    onMoveToContainer: (EntryId, ContainerId) -> Unit = { _, _ -> },
+    onRemoveFromContainer: (EntryId) -> Unit = {},
 ) {
     val comic by viewModel.comic.collectAsStateWithLifecycle()
     val copies by viewModel.ownedCopies.collectAsStateWithLifecycle()
+    var moveEntry by remember { mutableStateOf<EntryId?>(null) }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text((comic as? Loadable.Ready)?.value?.displayTitle ?: "") },
-                navigationIcon = { HomeIconButton(onGoHome) },
-            )
+            Column {
+                TopAppBar(
+                    title = { Text((comic as? Loadable.Ready)?.value?.displayTitle ?: "") },
+                    navigationIcon = { HomeIconButton(onGoHome) },
+                )
+                RainbowStripe()
+            }
         },
     ) { padding ->
         when (val c = comic) {
@@ -98,9 +113,25 @@ fun ComicDetailScreen(
                     HorizontalDivider()
                     Text("In your collection", style = MaterialTheme.typography.titleMedium)
                     copies.forEach { copy ->
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(copy.ownedCoverName ?: "Cover A")
-                            TextButton(onClick = { onRemoveCopy(copy.id) }) { Text("Remove") }
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column {
+                                Text(copy.ownedCoverName ?: "Cover A")
+                                copy.containerName?.let {
+                                    Text(
+                                        it,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                            Row {
+                                TextButton(onClick = { moveEntry = copy.id }) { Text("Move") }
+                                TextButton(onClick = { onRemoveCopy(copy.id) }) { Text("Remove") }
+                            }
                         }
                     }
                 }
@@ -120,6 +151,16 @@ fun ComicDetailScreen(
             }
         }
     }
+
+    moveEntry?.let { entryId ->
+        MoveToContainerSheet(
+            entryId = entryId,
+            containers = containers,
+            onMove = { id, containerId -> onMoveToContainer(id, containerId) },
+            onRemoveFromContainer = { id -> onRemoveFromContainer(id) },
+            onDismiss = { moveEntry = null },
+        )
+    }
 }
 
 @Composable
@@ -138,7 +179,7 @@ private fun CoversRow(comic: Comic) {
 private fun Header(comic: Comic) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(comic.displayTitle, style = MaterialTheme.typography.headlineSmall)
-        comic.title?.let { Text("“$it”", style = MaterialTheme.typography.titleMedium) }
+        comic.title?.let { Text("\u201c$it\u201d", style = MaterialTheme.typography.titleMedium) }
         Text("${comic.publisher.name} · ${comic.series.displayName}", style = MaterialTheme.typography.bodyMedium)
         // Release (in-store) date is what collectors care about; cover date is often months later.
         comic.storeDate?.let { Text("Released $it", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium) }

@@ -16,12 +16,16 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Badge
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -45,40 +49,44 @@ import com.guturner.longbox.domain.library.LibrarySort
 import com.guturner.longbox.domain.model.CollectionEntry
 import com.guturner.longbox.domain.model.ComicId
 import com.guturner.longbox.domain.model.Container
-import com.guturner.longbox.domain.model.ContainerId
-import com.guturner.longbox.domain.model.ContainerKind
 import com.guturner.longbox.domain.model.EntryId
 import com.guturner.longbox.domain.model.EntryState
+import com.guturner.longbox.domain.model.SeriesId
+import com.guturner.longbox.domain.model.CreatorId
+import com.guturner.longbox.domain.model.StoryArcId
+import com.guturner.longbox.domain.model.PublisherId
 import com.guturner.longbox.presentation.LibraryViewModel
 import com.guturner.longbox.ui.ThemeMode
 import com.guturner.longbox.ui.components.CenteredMessage
 import com.guturner.longbox.ui.components.CoverImage
 import com.guturner.longbox.ui.components.CoverSize
-import com.guturner.longbox.ui.components.HomeIconButton
 import com.guturner.longbox.ui.components.MetronAttribution
 import com.guturner.longbox.ui.components.PendingCover
+import com.guturner.longbox.ui.components.RainbowStripe
 import com.guturner.longbox.ui.containers.MoveToContainerSheet
 
-private enum class FacetKind(val label: String) { SERIES("Title"), WRITER("Writer"), ARTIST("Artist"), EVENT("Event"), PUBLISHER("Publisher"), CONTAINER("Container") }
+private enum class FacetKind(val label: String) {
+    SERIES("Title"), WRITER("Writer"), ARTIST("Artist"), EVENT("Event"), PUBLISHER("Publisher")
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun LibraryScreen(
     viewModel: LibraryViewModel,
+    activeContainer: Container?,
+    onBack: () -> Unit,
     onOpenComic: (ComicId) -> Unit,
     onScan: (() -> Unit)?,
     onCheckInShop: (() -> Unit)?,
     onAddManually: () -> Unit,
     onOpenReleases: () -> Unit,
     onOpenPullList: () -> Unit,
-    onOpenContainers: () -> Unit,
     onSignOut: () -> Unit,
     coverSize: CoverSize,
     onCoverSizeChange: (CoverSize) -> Unit,
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     onThemeModeChange: (ThemeMode) -> Unit = {},
-    stacks: List<Container> = emptyList(),
-    boxes: List<Container> = emptyList(),
+    containers: List<Container> = emptyList(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -92,43 +100,55 @@ internal fun LibraryScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Longbox · ${state.totalInCollection}") },
-                navigationIcon = { HomeIconButton(onClick = {}) },
-                actions = {
-                    TextButton(onClick = onOpenReleases) { Text("New Releases") }
-                    TextButton(onClick = onOpenPullList) { Text("Pull List") }
-                    TextButton(onClick = { menuOpen = true }) { Text("More") }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(text = { Text("Add or check by UPC") }, onClick = { menuOpen = false; onAddManually() })
-                        onCheckInShop?.let { check ->
-                            DropdownMenuItem(text = { Text("Do I own this? (scan)") }, onClick = { menuOpen = false; check() })
+            Column {
+                TopAppBar(
+                    title = {
+                        Text(
+                            activeContainer?.name ?: "Longbox · ${state.totalInCollection}",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
-                        DropdownMenuItem(text = { Text("Refresh") }, onClick = { menuOpen = false; viewModel.refresh() })
-                        if (state.entries.any { it.comic == null }) {
-                            DropdownMenuItem(text = { Text("Remove all unresolved") }, onClick = { menuOpen = false; viewModel.removeAllUnresolved() })
+                    },
+                    actions = {
+                        TextButton(onClick = onOpenReleases) { Text("New Releases") }
+                        TextButton(onClick = onOpenPullList) { Text("Pull List") }
+                        TextButton(onClick = { menuOpen = true }) { Text("More") }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(text = { Text("Add or check by UPC") }, onClick = { menuOpen = false; onAddManually() })
+                            onCheckInShop?.let { check ->
+                                DropdownMenuItem(text = { Text("Do I own this? (scan)") }, onClick = { menuOpen = false; check() })
+                            }
+                            DropdownMenuItem(text = { Text("Refresh") }, onClick = { menuOpen = false; viewModel.refresh() })
+                            if (state.entries.any { it.comic == null }) {
+                                DropdownMenuItem(text = { Text("Remove all unresolved") }, onClick = { menuOpen = false; viewModel.removeAllUnresolved() })
+                            }
+                            DropdownMenuItem(text = { Text("Sign out") }, onClick = { menuOpen = false; onSignOut() })
+                            androidx.compose.material3.HorizontalDivider()
+                            CoverSize.entries.forEach { size ->
+                                DropdownMenuItem(
+                                    text = { Text("Covers: ${size.label}") },
+                                    trailingIcon = if (coverSize == size) { { Text("✓") } } else null,
+                                    onClick = { menuOpen = false; onCoverSizeChange(size) },
+                                )
+                            }
+                            androidx.compose.material3.HorizontalDivider()
+                            ThemeMode.entries.forEach { mode ->
+                                DropdownMenuItem(
+                                    text = { Text("Theme: ${mode.label}") },
+                                    trailingIcon = if (themeMode == mode) { { Text("✓") } } else null,
+                                    onClick = { menuOpen = false; onThemeModeChange(mode) },
+                                )
+                            }
                         }
-                        DropdownMenuItem(text = { Text("Stacks & Boxes") }, onClick = { menuOpen = false; onOpenContainers() })
-                        DropdownMenuItem(text = { Text("Sign out") }, onClick = { menuOpen = false; onSignOut() })
-                        androidx.compose.material3.HorizontalDivider()
-                        CoverSize.entries.forEach { size ->
-                            DropdownMenuItem(
-                                text = { Text("Covers: ${size.label}") },
-                                trailingIcon = if (coverSize == size) { { Text("✓") } } else null,
-                                onClick = { menuOpen = false; onCoverSizeChange(size) },
-                            )
-                        }
-                        androidx.compose.material3.HorizontalDivider()
-                        ThemeMode.entries.forEach { mode ->
-                            DropdownMenuItem(
-                                text = { Text("Theme: ${mode.label}") },
-                                trailingIcon = if (themeMode == mode) { { Text("✓") } } else null,
-                                onClick = { menuOpen = false; onThemeModeChange(mode) },
-                            )
-                        }
-                    }
-                },
-            )
+                    },
+                )
+                RainbowStripe()
+            }
         },
         floatingActionButton = {
             if (onScan != null) ExtendedFloatingActionButton(onClick = onScan) { Text("Scan") }
@@ -151,7 +171,6 @@ internal fun LibraryScreen(
                     FacetKind.ARTIST to state.query.filter.artistIds.size,
                     FacetKind.EVENT to state.query.filter.storyArcIds.size,
                     FacetKind.PUBLISHER to state.query.filter.publisherIds.size,
-                    FacetKind.CONTAINER to state.query.filter.containerIds.size,
                 ),
                 sort = state.query.sort,
                 onOpen = { openFacet = it },
@@ -178,11 +197,12 @@ internal fun LibraryScreen(
             }
 
             if (state.entries.isEmpty()) {
-                CenteredMessage(
-                    if (state.totalInCollection == 0) "Your longbox is empty. Scan a barcode to add your first comic."
-                    else "No comics match these filters.",
-                    Modifier.weight(1f),
-                )
+                val message = when {
+                    activeContainer != null -> "No comics in ${activeContainer.name} yet.\nScan a barcode to add your first comic."
+                    state.totalInCollection == 0 -> "Your longbox is empty.\nScan a barcode to add your first comic."
+                    else -> "No comics match these filters."
+                }
+                CenteredMessage(message, Modifier.weight(1f))
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = coverSize.gridMinDp.dp),
@@ -213,24 +233,15 @@ internal fun LibraryScreen(
             FacetKind.ARTIST -> FacetPickerDialog(kind.label, facets.artists, state.query.filter.artistIds, viewModel::toggleArtist) { openFacet = null }
             FacetKind.EVENT -> FacetPickerDialog(kind.label, facets.storyArcs, state.query.filter.storyArcIds, viewModel::toggleStoryArc) { openFacet = null }
             FacetKind.PUBLISHER -> FacetPickerDialog(kind.label, facets.publishers, state.query.filter.publisherIds, viewModel::togglePublisher) { openFacet = null }
-            FacetKind.CONTAINER -> ContainerPickerDialog(
-                stacks = stacks,
-                boxes = boxes,
-                selected = state.query.filter.containerIds,
-                onToggle = viewModel::toggleContainer,
-                onDismiss = { openFacet = null },
-            )
         }
     }
 
     moveSheetEntry?.let { entryId ->
         MoveToContainerSheet(
             entryId = entryId,
-            stacks = stacks,
-            boxes = boxes,
+            containers = containers,
             onMove = { id, containerId -> viewModel.moveToContainer(id, containerId) },
             onRemoveFromContainer = { id -> viewModel.removeFromContainer(id) },
-            onCreateContainer = { _, _ -> /* navigate to containers screen */ },
             onDismiss = { moveSheetEntry = null },
         )
     }
@@ -315,39 +326,6 @@ private fun LibraryTile(
             overflow = TextOverflow.Ellipsis,
         )
     }
-}
-
-@Composable
-private fun ContainerPickerDialog(
-    stacks: List<Container>,
-    boxes: List<Container>,
-    selected: Set<ContainerId>,
-    onToggle: (ContainerId) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val all = stacks + boxes
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
-        title = { Text("Filter by Container") },
-        text = {
-            androidx.compose.foundation.lazy.LazyColumn {
-                items(all.size) { index ->
-                    val container = all[index]
-                    Row(
-                        Modifier.fillMaxWidth().clickable { onToggle(container.id) }.padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(
-                            (if (container.id in selected) "✓ " else "") + container.name,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text("${container.entryCount}", style = MaterialTheme.typography.labelMedium)
-                    }
-                }
-            }
-        },
-    )
 }
 
 @Composable

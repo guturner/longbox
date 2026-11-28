@@ -53,7 +53,7 @@ class ContainerServiceTest {
                 EntryId(entryId.toString()), "code", EntryState.IN_STACK, null, null,
                 Instant.now().toEpochMilli(),
             )
-            val newState = if (container.kind == ContainerKind.BOX) EntryState.IN_BOX else EntryState.IN_STACK
+            val newState = if (container.kind != ContainerKind.STACK) EntryState.IN_BOX else EntryState.IN_STACK
             val updated = entry.copy(
                 state = newState,
                 containerId = ContainerId(containerId.toString()),
@@ -103,7 +103,7 @@ class ContainerServiceTest {
         val containerEvents = RecordingContainerEventPublisher()
         val service = buildService(store, entryEvents, containerEvents)
 
-        val created = service.create(userId, "Old Name", ContainerKind.BOX)
+        val created = service.create(userId, "Old Name", ContainerKind.SHORT_BOX)
         assertIs<Outcome.Success<*>>(created)
         containerEvents.recorded.clear()
 
@@ -143,7 +143,7 @@ class ContainerServiceTest {
         val containerEvents = RecordingContainerEventPublisher()
         val service = buildService(store, entryEvents, containerEvents)
 
-        val created = service.create(userId, "Physical Box", ContainerKind.BOX)
+        val created = service.create(userId, "Physical Box", ContainerKind.LONG_BOX)
         assertIs<Outcome.Success<*>>(created)
         val containerId = (created as Outcome.Success).value.id.value
 
