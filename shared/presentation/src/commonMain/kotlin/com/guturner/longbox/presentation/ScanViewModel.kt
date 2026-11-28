@@ -54,12 +54,15 @@ class ScanViewModel(
 
     private val lastHandled = mutableMapOf<String, Long>()
     private var inFlight: String? = null
+    /** Codes successfully processed in this scanner session; silently rejected if scanned again. */
+    private val sessionCodes = mutableSetOf<String>()
 
     fun setMode(mode: ScanMode) = mutableState.update { it.copy(mode = mode, ownership = null) }
 
     /** Returns true if the detection was accepted (the UI uses this to vibrate / beep). */
     fun onDetected(mainCode: String, addOn: String?): Boolean {
         val key = mainCode + (addOn ?: "")
+        if (key in sessionCodes) return false
         val now = nowMillis()
         val last = lastHandled[key]
         if (inFlight == key || (last != null && now - last < REPEAT_WINDOW_MS)) return false
@@ -92,6 +95,7 @@ class ScanViewModel(
             val key = pending.mainCode + (pending.addOn ?: "")
             val feedback = when (val result = scanComic(pending.mainCode, pending.addOn)) {
                 is Outcome.Success -> {
+                    sessionCodes.add(key)
                     mutableState.update { it.copy(sessionCount = it.sessionCount + 1) }
                     val where = if (result.value.isQueuedOnDevice) "saved on this device until you're home" else "looking it up…"
                     ScanFeedback(key, UiMessage("Added another copy — $where", isError = false))
@@ -121,6 +125,7 @@ class ScanViewModel(
         }
         val feedback = when (val result = scanComic(mainCode, addOn)) {
             is Outcome.Success -> {
+                sessionCodes.add(key)
                 mutableState.update { it.copy(sessionCount = it.sessionCount + 1) }
                 val where = if (result.value.isQueuedOnDevice) "saved on this device until you're home" else "looking it up…"
                 ScanFeedback(key, UiMessage("Added ${formatCode(key)} — $where", isError = false))
