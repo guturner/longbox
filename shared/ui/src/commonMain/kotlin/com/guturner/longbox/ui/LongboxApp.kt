@@ -103,6 +103,11 @@ private fun SignedInApp(
                     library.showOnly(LibraryFilter(containerIds = setOf(container.id)))
                     nav.navigate(LibraryRoute)
                 },
+                onBrowseAll = {
+                    activeContainer = null
+                    library.clearFilters()
+                    nav.navigate(LibraryRoute)
+                },
             )
         }
         composable<LibraryRoute> {

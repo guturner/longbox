@@ -60,6 +60,7 @@ import org.jetbrains.compose.resources.painterResource
 fun ContainersScreen(
     viewModel: ContainersViewModel,
     onFilterByContainer: (Container) -> Unit,
+    onBrowseAll: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -97,36 +98,44 @@ fun ContainersScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        if (state.containers.isEmpty() && !state.isLoading) {
-            Column(
-                Modifier.fillMaxSize().padding(padding).padding(32.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    "No stacks or boxes yet.",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Text(
-                    "Tap + to create your first container.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        } else {
-            LazyColumn(
-                Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                itemsIndexed(state.containers, key = { _, c -> c.id.value }) { index, container ->
-                    ContainerTile(
-                        container = container,
-                        tileColor = rainbowFor(index),
-                        onClick = { onFilterByContainer(container) },
-                        onDelete = { viewModel.deleteContainer(container.id) },
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            if (state.containers.isEmpty() && !state.isLoading) {
+                Column(
+                    Modifier.weight(1f).padding(32.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        "No stacks or boxes yet.",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        "Tap + to create your first container.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            } else {
+                LazyColumn(
+                    Modifier.weight(1f),
+                    contentPadding = PaddingValues(vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    itemsIndexed(state.containers, key = { _, c -> c.id.value }) { index, container ->
+                        ContainerTile(
+                            container = container,
+                            tileColor = rainbowFor(index),
+                            onClick = { onFilterByContainer(container) },
+                            onDelete = { viewModel.deleteContainer(container.id) },
+                        )
+                    }
+                }
+            }
+            TextButton(
+                onClick = onBrowseAll,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            ) {
+                Text("Browse all comics")
             }
         }
     }
