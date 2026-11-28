@@ -136,6 +136,7 @@ class LibraryViewModel(
         viewModelScope.launch {
             val result = containers?.moveToContainer(entryId, containerId)
             if (result is Outcome.Failure) transient.update { it.copy(message = result.error.toUiMessage()) }
+            else containers?.refresh()
         }
     }
 
@@ -143,6 +144,7 @@ class LibraryViewModel(
         viewModelScope.launch {
             val result = containers?.removeFromContainer(entryId)
             if (result is Outcome.Failure) transient.update { it.copy(message = result.error.toUiMessage()) }
+            else containers?.refresh()
         }
     }
 

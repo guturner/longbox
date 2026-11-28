@@ -65,6 +65,7 @@ fun ContainersScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var showCreate by remember { mutableStateOf(false) }
+    var renameTarget by remember { mutableStateOf<Container?>(null) }
 
     LaunchedEffect(state.message) {
         state.message?.let { snackbar.showSnackbar(it.text); viewModel.dismissMessage() }
@@ -126,6 +127,7 @@ fun ContainersScreen(
                             container = container,
                             tileColor = rainbowFor(index),
                             onClick = { onFilterByContainer(container) },
+                            onRename = { renameTarget = container },
                             onDelete = { viewModel.deleteContainer(container.id) },
                         )
                     }
@@ -146,6 +148,14 @@ fun ContainersScreen(
             onDismiss = { showCreate = false },
         )
     }
+
+    renameTarget?.let { target ->
+        RenameContainerDialog(
+            current = target.name,
+            onRename = { newName -> viewModel.renameContainer(target.id, newName); renameTarget = null },
+            onDismiss = { renameTarget = null },
+        )
+    }
 }
 
 @Composable
@@ -153,6 +163,7 @@ private fun ContainerTile(
     container: Container,
     tileColor: Color,
     onClick: () -> Unit,
+    onRename: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Surface(
@@ -192,6 +203,9 @@ private fun ContainerTile(
                 contentColor = Color.White,
                 modifier = Modifier.padding(end = 8.dp),
             ) { Text("${container.entryCount}") }
+            TextButton(onClick = onRename) {
+                Text("Rename", color = Color.White.copy(alpha = 0.85f))
+            }
             TextButton(onClick = onDelete) {
                 Text("Remove", color = Color.White.copy(alpha = 0.85f))
             }
@@ -248,6 +262,29 @@ internal fun CreateContainerDialog(onCreate: (String, ContainerKind) -> Unit, on
         confirmButton = {
             TextButton(onClick = { if (name.isNotBlank()) onCreate(name, kind) }, enabled = name.isNotBlank()) {
                 Text("Create")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun RenameContainerDialog(current: String, onRename: (String) -> Unit, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf(current) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename container") },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Name") },
+                singleLine = true,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { if (name.isNotBlank()) onRename(name) }, enabled = name.isNotBlank()) {
+                Text("Rename")
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
