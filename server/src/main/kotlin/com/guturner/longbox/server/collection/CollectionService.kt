@@ -8,6 +8,7 @@ import com.guturner.longbox.domain.model.Outcome
 import com.guturner.longbox.server.events.EntryEvent
 import com.guturner.longbox.server.events.EntryEventPublisher
 import com.guturner.longbox.server.persistence.CollectionStore
+import com.guturner.longbox.server.persistence.ContainerStore
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
@@ -18,6 +19,7 @@ class CollectionService(
     private val worker: ScanWorker,
     private val events: EntryEventPublisher,
     private val now: () -> Instant = Instant::now,
+    private val containerStore: ContainerStore? = null,
 ) {
 
     suspend fun list(userId: UUID): List<CollectionEntry> = store.list(userId)
@@ -28,6 +30,7 @@ class CollectionService(
         addOn: String?,
         clientMutationId: String? = null,
         scannedAtEpochMillis: Long? = null,
+        targetContainerId: String? = null,
     ): Outcome<CollectionEntry> {
         val barcode = when (val parsed = ComicBarcode.parse(code, addOn)) {
             is BarcodeParseResult.Invalid -> return Outcome.Failure(DomainError.InvalidBarcode(parsed.error))
@@ -52,6 +55,12 @@ class CollectionService(
         } else {
             events.publish(EntryEvent.Scanned(id, now(), barcode.fullCode))
             worker.wakeUp()
+        }
+        // Atomically assign the container requested by the client (best-effort: scan succeeds even if the
+        // container id is invalid or doesn't belong to this user — the entry just lands unorganised).
+        if (!isCopyIncrement && targetContainerId != null) {
+            val containerId = runCatching { UUID.fromString(targetContainerId) }.getOrNull()
+            if (containerId != null) containerStore?.moveEntry(userId, id, containerId)
         }
         return store.find(userId, id)?.let { Outcome.Success(it) } ?: Outcome.Failure(DomainError.Unexpected("insert failed"))
     }

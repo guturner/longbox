@@ -82,7 +82,7 @@ fun Application.module(config: AppConfig) {
     val containerStore = JdbcContainerStore(db)
     val eventBus = AppEventBus()
     val worker = ScanWorker(collectionStore, ResolveBarcodeUseCase(catalog), eventBus)
-    val collection = CollectionService(collectionStore, worker, eventBus)
+    val collection = CollectionService(collectionStore, worker, eventBus, containerStore = containerStore)
     val containerService = ContainerService(containerStore, eventBus, eventBus)
 
     val imageClient = HttpClient(OkHttp) {

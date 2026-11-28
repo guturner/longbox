@@ -1,11 +1,9 @@
 package com.guturner.longbox.data.repository
 
 import com.guturner.longbox.contract.API_V1
-import com.guturner.longbox.contract.CollectionEntryDto
 import com.guturner.longbox.contract.CollectionResponse
 import com.guturner.longbox.contract.ContractMapper
 import com.guturner.longbox.contract.CreatorDto
-import com.guturner.longbox.contract.MoveToContainerRequest
 import com.guturner.longbox.contract.ScanRequest
 import com.guturner.longbox.contract.StoryArcDto
 import com.guturner.longbox.data.local.CachedLibrary
@@ -24,7 +22,6 @@ import com.guturner.longbox.domain.model.Outcome
 import com.guturner.longbox.domain.repository.CollectionRepository
 import com.guturner.longbox.domain.repository.SyncController
 import com.guturner.longbox.domain.repository.SyncState
-import io.ktor.client.call.body
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
@@ -187,34 +184,15 @@ class OfflineFirstCollectionRepository(
 
     private suspend fun replay(change: PendingChange): Outcome<Unit> = when (change) {
         is PendingChange.AddScan -> {
+            // targetContainerId is included in the request so the server assigns the container
+            // atomically — no second round-trip needed, no race between scan and assignment.
             val scanResult = api.send {
                 method = HttpMethod.Post
                 url.takeFrom("$API_V1/collection/scans")
                 contentType(ContentType.Application.Json)
-                setBody(ScanRequest(change.code, change.addOn, clientMutationId = change.id, scannedAtEpochMillis = change.createdAtEpochMillis))
+                setBody(ScanRequest(change.code, change.addOn, clientMutationId = change.id, scannedAtEpochMillis = change.createdAtEpochMillis, targetContainerId = change.targetContainerId))
             }
             if (scanResult is Outcome.Failure) return scanResult
-            // If the scan was tagged with a target container, move the entry to it now that we
-            // have the server-assigned entry UUID from the scan response.
-            val targetContainerId = change.targetContainerId
-            if (targetContainerId != null) {
-                val scanResponse = (scanResult as? Outcome.Success)?.value
-                val entryId: String? = try {
-                    scanResponse?.body<CollectionEntryDto>()?.id
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-                    null
-                }
-                if (entryId != null) {
-                    api.send {
-                        method = HttpMethod.Post
-                        url.takeFrom("$API_V1/containers/$targetContainerId/entries")
-                        contentType(ContentType.Application.Json)
-                        setBody(MoveToContainerRequest(entryId))
-                    }
-                    // Container assignment is best-effort: if it fails we still count the scan as done.
-                }
-            }
             Outcome.Success(Unit)
         }
 

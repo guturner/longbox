@@ -97,6 +97,8 @@ data class ScanRequest(
     val addOn: String? = null,
     val clientMutationId: String? = null,
     val scannedAtEpochMillis: Long? = null,
+    /** If set, the server assigns the entry to this container atomically in the same transaction. */
+    val targetContainerId: String? = null,
 )
 
 @Serializable

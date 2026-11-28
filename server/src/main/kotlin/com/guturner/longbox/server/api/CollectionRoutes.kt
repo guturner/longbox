@@ -42,7 +42,7 @@ fun Route.collectionRoutes(collection: CollectionService, catalog: ComicCatalog)
 
                 post("scans") {
                     val request = call.receive<ScanRequest>()
-                    when (val result = collection.addScan(call.userId(), request.code, request.addOn, request.clientMutationId, request.scannedAtEpochMillis)) {
+                    when (val result = collection.addScan(call.userId(), request.code, request.addOn, request.clientMutationId, request.scannedAtEpochMillis, request.targetContainerId)) {
                         is Outcome.Success -> call.respond(HttpStatusCode.Accepted, ContractMapper.asEntryDto(result.value))
                         is Outcome.Failure -> call.respondError(result.error)
                     }
