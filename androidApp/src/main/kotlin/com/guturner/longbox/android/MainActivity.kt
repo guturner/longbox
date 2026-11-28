@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
         val platform = object : PlatformServices {
             override suspend fun requestGoogleIdToken(): String? = signInWithGoogle()
             override val scanner: ScannerContent = CameraBarcodeScanner
+            override val isCompactLayout: Boolean = true
             override fun generateQrCode(content: String, sizePx: Int): ImageBitmap? = runCatching {
                 val bits = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, sizePx, sizePx)
                 val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)

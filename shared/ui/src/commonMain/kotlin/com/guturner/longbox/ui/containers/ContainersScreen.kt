@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.DropdownMenu
@@ -228,14 +229,31 @@ private fun ContainerTile(
                 contentColor = Color.White,
                 modifier = Modifier.padding(end = 8.dp),
             ) { Text("${container.entryCount}") }
-            TextButton(onClick = onRename) {
-                Text("Rename", color = Color.White.copy(alpha = 0.85f))
-            }
-            TextButton(onClick = onLabel) {
-                Text("Label", color = Color.White.copy(alpha = 0.85f))
-            }
-            TextButton(onClick = onDelete) {
-                Text("Remove", color = Color.White.copy(alpha = 0.85f))
+            val platform = LocalPlatform.current
+            if (platform.isCompactLayout) {
+                // On Android: collapse actions into a single ellipsis dropdown to save space.
+                var tileMenuOpen by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { tileMenuOpen = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "Options", tint = Color.White)
+                    }
+                    DropdownMenu(expanded = tileMenuOpen, onDismissRequest = { tileMenuOpen = false }) {
+                        DropdownMenuItem(text = { Text("Rename") }, onClick = { tileMenuOpen = false; onRename() })
+                        DropdownMenuItem(text = { Text("Label") }, onClick = { tileMenuOpen = false; onLabel() })
+                        DropdownMenuItem(text = { Text("Remove") }, onClick = { tileMenuOpen = false; onDelete() })
+                    }
+                }
+            } else {
+                // On Desktop/Web: keep actions expanded for easy mouse access.
+                TextButton(onClick = onRename) {
+                    Text("Rename", color = Color.White.copy(alpha = 0.85f))
+                }
+                TextButton(onClick = onLabel) {
+                    Text("Label", color = Color.White.copy(alpha = 0.85f))
+                }
+                TextButton(onClick = onDelete) {
+                    Text("Remove", color = Color.White.copy(alpha = 0.85f))
+                }
             }
             Spacer(Modifier.width(4.dp))
         }

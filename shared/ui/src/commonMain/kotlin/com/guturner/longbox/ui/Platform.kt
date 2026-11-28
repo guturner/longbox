@@ -20,6 +20,9 @@ interface PlatformServices {
      * Returns null on platforms without a QR generator (e.g. web).
      */
     fun generateQrCode(content: String, sizePx: Int): ImageBitmap? = null
+
+    /** True on mobile (Android) where screen real estate is limited. Desktop/Web are false. */
+    val isCompactLayout: Boolean get() = false
 }
 
 interface ScannerContent {
