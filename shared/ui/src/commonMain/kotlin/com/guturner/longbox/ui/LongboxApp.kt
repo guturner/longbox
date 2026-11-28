@@ -80,6 +80,7 @@ fun LongboxApp(
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun SignedInApp(
     graph: AppGraph,
@@ -100,7 +101,7 @@ private fun SignedInApp(
     val containersVm = viewModel { ContainersViewModel(graph.containerRepository) }
     val containersState by containersVm.state.collectAsStateWithLifecycle()
     val pullListVm = viewModel { PullListViewModel(graph.pullList, graph.collectionRepository, graph.getWeeklyReleases, graph.clock) }
-    val manualScan = viewModel(key = "manual-scan") { ScanViewModel(graph.scanComic, graph.checkOwnership, graph.nowMillis) }
+    val manualScan = viewModel(key = "manual-scan") { ScanViewModel(graph.scanComic, graph.checkOwnership, graph.nowMillis, containerRepository = graph.containerRepository) }
     var showManualEntry by remember { mutableStateOf(false) }
     var activeContainer by remember { mutableStateOf<Container?>(null) }
     val coverSize by graph.coverSize.collectAsStateWithLifecycle()
@@ -186,7 +187,7 @@ private fun SignedInApp(
             val scanner = platform.scanner ?: return@composable
             val check = entry.toRoute<ScanRoute>().check
             val vm = viewModel(key = "scan-$check") {
-                ScanViewModel(graph.scanComic, graph.checkOwnership, graph.nowMillis, if (check) ScanMode.CHECK else ScanMode.ADD)
+                ScanViewModel(graph.scanComic, graph.checkOwnership, graph.nowMillis, if (check) ScanMode.CHECK else ScanMode.ADD, graph.containerRepository)
             }
             ScanScreen(vm, scanner, onClose = { nav.popBackStack() })
         }

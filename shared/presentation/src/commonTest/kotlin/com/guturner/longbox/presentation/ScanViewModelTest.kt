@@ -2,15 +2,21 @@ package com.guturner.longbox.presentation
 
 import com.guturner.longbox.domain.barcode.ComicBarcode
 import com.guturner.longbox.domain.model.CollectionEntry
+import com.guturner.longbox.domain.model.Container
+import com.guturner.longbox.domain.model.ContainerId
+import com.guturner.longbox.domain.model.ContainerKind
 import com.guturner.longbox.domain.model.EntryId
 import com.guturner.longbox.domain.model.EntryState
 import com.guturner.longbox.domain.model.Outcome
 import com.guturner.longbox.domain.repository.CollectionRepository
+import com.guturner.longbox.domain.repository.ContainerRepository
 import com.guturner.longbox.domain.usecase.CheckOwnershipUseCase
 import com.guturner.longbox.domain.usecase.ScanComicUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -39,6 +45,20 @@ class ScanViewModelTest {
         }
     }
 
+    private object NoOpContainerRepository : ContainerRepository {
+        override fun observeContainers(): Flow<List<Container>> = flowOf(emptyList())
+        override suspend fun refresh(): Outcome<Unit> = Outcome.Success(Unit)
+        override suspend fun createContainer(name: String, kind: ContainerKind, clientMutationId: String?): Outcome<Container> =
+            Outcome.Failure(com.guturner.longbox.domain.model.DomainError.Unexpected("stub"))
+        override suspend fun renameContainer(id: ContainerId, newName: String): Outcome<Container> =
+            Outcome.Failure(com.guturner.longbox.domain.model.DomainError.Unexpected("stub"))
+        override suspend fun deleteContainer(id: ContainerId): Outcome<Unit> = Outcome.Success(Unit)
+        override suspend fun moveToContainer(entryId: EntryId, containerId: ContainerId): Outcome<CollectionEntry> =
+            Outcome.Failure(com.guturner.longbox.domain.model.DomainError.Unexpected("stub"))
+        override suspend fun removeFromContainer(entryId: EntryId): Outcome<CollectionEntry> =
+            Outcome.Failure(com.guturner.longbox.domain.model.DomainError.Unexpected("stub"))
+    }
+
     private var now = 0L
     private val repo = RecordingRepository()
     private lateinit var viewModel: ScanViewModel
@@ -46,7 +66,7 @@ class ScanViewModelTest {
     @BeforeTest
     fun setup() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
-        viewModel = ScanViewModel(ScanComicUseCase(repo), CheckOwnershipUseCase(repo), nowMillis = { now })
+        viewModel = ScanViewModel(ScanComicUseCase(repo), CheckOwnershipUseCase(repo), nowMillis = { now }, containerRepository = NoOpContainerRepository)
     }
 
     @AfterTest

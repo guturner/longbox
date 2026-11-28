@@ -3,7 +3,11 @@ package com.guturner.longbox.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.guturner.longbox.domain.barcode.ComicBarcode
+import com.guturner.longbox.domain.model.Container
+import com.guturner.longbox.domain.model.ContainerId
+import com.guturner.longbox.domain.model.ContainerKind
 import com.guturner.longbox.domain.model.Outcome
+import com.guturner.longbox.domain.repository.ContainerRepository
 import com.guturner.longbox.domain.usecase.CheckOwnershipUseCase
 import com.guturner.longbox.domain.usecase.Ownership
 import com.guturner.longbox.domain.usecase.ScanComicUseCase
@@ -33,6 +37,10 @@ data class ScanUiState(
     /** Result of the last CHECK-mode scan. */
     val ownership: OwnershipCard? = null,
     val duplicatePending: DuplicateScan? = null,
+    /** All available containers to pick from in ADD mode. */
+    val containers: List<Container> = emptyList(),
+    /** Where scanned comics will land in ADD mode; null = no container assignment. */
+    val selectedContainerId: ContainerId? = null,
 )
 
 data class ScanFeedback(val code: String, val message: UiMessage)
@@ -41,12 +49,16 @@ data class ScanFeedback(val code: String, val message: UiMessage)
  * Turns camera detections into collection entries (ADD) or ownership answers (CHECK).
  * Cameras report the same barcode many times per second, so a code is ignored if it was
  * handled within the last [REPEAT_WINDOW_MS]. Both modes work offline.
+ *
+ * In ADD mode, each successful scan is immediately moved to [ScanUiState.selectedContainerId]
+ * (default: the oldest Stack). The user can change the target via [selectContainer].
  */
 class ScanViewModel(
     private val scanComic: ScanComicUseCase,
     private val checkOwnership: CheckOwnershipUseCase,
     private val nowMillis: () -> Long,
     initialMode: ScanMode = ScanMode.ADD,
+    private val containerRepository: ContainerRepository,
 ) : ViewModel() {
 
     private val mutableState = MutableStateFlow(ScanUiState(mode = initialMode))
@@ -57,7 +69,25 @@ class ScanViewModel(
     /** Codes successfully processed in this scanner session; silently rejected if scanned again. */
     private val sessionCodes = mutableSetOf<String>()
 
+    init {
+        viewModelScope.launch {
+            containerRepository.observeContainers().collect { all ->
+                mutableState.update { current ->
+                    // Auto-select the oldest Stack if nothing is selected yet.
+                    val autoSelected = all
+                        .filter { it.kind == ContainerKind.STACK }
+                        .minByOrNull { it.createdAtEpochMillis }
+                        ?.id
+                    val selected = current.selectedContainerId ?: autoSelected
+                    current.copy(containers = all, selectedContainerId = selected)
+                }
+            }
+        }
+    }
+
     fun setMode(mode: ScanMode) = mutableState.update { it.copy(mode = mode, ownership = null) }
+
+    fun selectContainer(id: ContainerId?) = mutableState.update { it.copy(selectedContainerId = id) }
 
     /** Returns true if the detection was accepted (the UI uses this to vibrate / beep). */
     fun onDetected(mainCode: String, addOn: String?): Boolean {
@@ -98,6 +128,7 @@ class ScanViewModel(
             val key = pending.mainCode + (pending.addOn ?: "")
             val feedback = when (val result = scanComic(pending.mainCode, pending.addOn)) {
                 is Outcome.Success -> {
+                    moveToSelectedContainer(result.value.id.value)
                     sessionCodes.add(key)
                     mutableState.update { it.copy(sessionCount = it.sessionCount + 1) }
                     val where = if (result.value.isQueuedOnDevice) "saved on this device until you're home" else "looking it up…"
@@ -128,6 +159,7 @@ class ScanViewModel(
         }
         val feedback = when (val result = scanComic(mainCode, addOn)) {
             is Outcome.Success -> {
+                moveToSelectedContainer(result.value.id.value)
                 sessionCodes.add(key)
                 mutableState.update { it.copy(sessionCount = it.sessionCount + 1) }
                 val where = if (result.value.isQueuedOnDevice) "saved on this device until you're home" else "looking it up…"
@@ -139,6 +171,16 @@ class ScanViewModel(
             }
         }
         mutableState.update { it.copy(recent = (listOf(feedback) + it.recent).take(MAX_RECENT)) }
+    }
+
+    private suspend fun moveToSelectedContainer(entryIdValue: String) {
+        val containerId = mutableState.value.selectedContainerId ?: return
+        containerRepository.moveToContainer(
+            com.guturner.longbox.domain.model.EntryId(entryIdValue),
+            containerId,
+        )
+        // Failure is silent — the comic was scanned successfully; container assignment
+        // is best-effort and will be retried on next sync if queued offline.
     }
 
     private suspend fun check(key: String, mainCode: String, addOn: String?) {

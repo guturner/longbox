@@ -13,8 +13,12 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,6 +31,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.ExperimentalMaterial3Api
+import com.guturner.longbox.domain.model.ContainerId
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.guturner.longbox.presentation.DuplicateScan
 import com.guturner.longbox.presentation.OwnershipCard
@@ -35,6 +41,7 @@ import com.guturner.longbox.presentation.ScanViewModel
 import com.guturner.longbox.ui.ScannerContent
 
 /** Camera scanning with ADD (boxes, weekly pull) and CHECK ("do I own this?" in a shop) modes. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScanScreen(viewModel: ScanViewModel, scanner: ScannerContent, onClose: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -49,6 +56,11 @@ fun ScanScreen(viewModel: ScanViewModel, scanner: ScannerContent, onClose: () ->
                 ScanMode.CHECK -> state.ownership?.let { OwnershipResult(it, onAdd = viewModel::addCheckedComic) }
                     ?: Text("Point at a barcode to check your library. Works offline.")
                 ScanMode.ADD -> {
+                    ContainerPicker(
+                        containers = state.containers,
+                        selectedId = state.selectedContainerId,
+                        onSelect = viewModel::selectContainer,
+                    )
                     Text("${state.sessionCount} added this session", style = MaterialTheme.typography.titleSmall)
                     LazyColumn(Modifier.fillMaxWidth()) {
                         items(state.recent) { feedback ->
@@ -67,6 +79,37 @@ fun ScanScreen(viewModel: ScanViewModel, scanner: ScannerContent, onClose: () ->
 
     state.duplicatePending?.let { dup ->
         DuplicateDialog(dup, onConfirm = viewModel::confirmAddCopy, onDismiss = viewModel::dismissDuplicate)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ContainerPicker(
+    containers: List<com.guturner.longbox.domain.model.Container>,
+    selectedId: ContainerId?,
+    onSelect: (ContainerId?) -> Unit,
+) {
+    if (containers.isEmpty()) return
+    var expanded by remember { mutableStateOf(false) }
+    val selected = containers.firstOrNull { it.id == selectedId }
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = selected?.name ?: "No container",
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Scan into") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            containers.sortedWith(compareBy({ it.kind.ordinal }, { it.createdAtEpochMillis }))
+                .forEach { container ->
+                    DropdownMenuItem(
+                        text = { Text("${container.kind.name.lowercase().replaceFirstChar(Char::uppercase).replace("_", " ")} · ${container.name}") },
+                        onClick = { onSelect(container.id); expanded = false },
+                    )
+                }
+        }
     }
 }
 
