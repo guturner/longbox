@@ -42,7 +42,7 @@ const val COVER_ASPECT = 0.66f
 internal enum class CoverSize(val gridMinDp: Int, val listWidthDp: Int, val label: String) {
     SMALL(132, 48, "Small"),
     MEDIUM(160, 72, "Medium"),
-    LARGE(200, 104, "Large"),
+    LARGE(300, 128, "Large"),
 }
 
 @Composable
