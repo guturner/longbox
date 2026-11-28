@@ -68,7 +68,17 @@ internal fun PullListScreen(viewModel: PullListViewModel, onGoHome: () -> Unit, 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Pull List · $dateLabel") },
+                title = {
+                    if (platform.isCompactLayout) {
+                        // Android: two-line title to avoid crowding the action buttons.
+                        Column {
+                            Text("Pull List", style = MaterialTheme.typography.titleMedium)
+                            Text(dateLabel, style = MaterialTheme.typography.labelSmall)
+                        }
+                    } else {
+                        Text("Pull List · $dateLabel")
+                    }
+                },
                 navigationIcon = { HomeIconButton(onGoHome) },
                 actions = {
                     TextButton(onClick = viewModel::previousWeek) { Text("‹") }
