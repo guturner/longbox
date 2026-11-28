@@ -31,9 +31,16 @@ class ObserveLibraryUseCase(
 ) {
     operator fun invoke(query: Flow<LibraryQuery>): Flow<LibraryView> =
         combine(collectionRepository.observeEntries(), query) { entries, q ->
+            // When browsing a specific container, scope facets to that container so search
+            // suggestions and filter chips only reflect what's actually in the container.
+            // Otherwise facets span the whole collection (normal library browse behaviour).
+            val facetSource = if (q.filter.containerIds.isNotEmpty())
+                entries.filter { it.containerId in q.filter.containerIds }
+            else
+                entries
             LibraryView(
                 entries = entries.filter(q.filter::matches).sortedWith(q.sort.comparator),
-                facets = LibraryFacets.from(entries),
+                facets = LibraryFacets.from(facetSource),
                 totalInCollection = entries.size,
             )
         }
