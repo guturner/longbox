@@ -108,6 +108,7 @@ private fun SignedInApp(
                     library.clearFilters()
                     nav.navigate(LibraryRoute)
                 },
+                onOpenPullList = { nav.navigate(PullListRoute) },
             )
         }
         composable<LibraryRoute> {

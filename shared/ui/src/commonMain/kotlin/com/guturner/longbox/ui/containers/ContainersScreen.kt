@@ -16,10 +16,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -61,11 +68,13 @@ fun ContainersScreen(
     viewModel: ContainersViewModel,
     onFilterByContainer: (Container) -> Unit,
     onBrowseAll: () -> Unit = {},
+    onOpenPullList: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var showCreate by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<Container?>(null) }
+    var menuOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.message) {
         state.message?.let { snackbar.showSnackbar(it.text); viewModel.dismissMessage() }
@@ -89,13 +98,23 @@ fun ContainersScreen(
                         "Longbox",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
                     )
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Filled.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(text = { Text("Browse all comics") }, onClick = { menuOpen = false; onBrowseAll() })
+                        DropdownMenuItem(text = { Text("Pull List") }, onClick = { menuOpen = false; onOpenPullList() })
+                    }
                 }
                 RainbowStripe()
             }
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = { showCreate = true }) { Text("Add Container") }
+            FloatingActionButton(onClick = { showCreate = true }) {
+                Icon(Icons.Filled.Add, contentDescription = "Add container")
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
@@ -132,12 +151,6 @@ fun ContainersScreen(
                         )
                     }
                 }
-            }
-            TextButton(
-                onClick = onBrowseAll,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-            ) {
-                Text("Browse all comics")
             }
         }
     }
@@ -232,7 +245,7 @@ internal fun CreateContainerDialog(onCreate: (String, ContainerKind) -> Unit, on
     var kind by remember { mutableStateOf(ContainerKind.SHORT_BOX) }
 
     val options = listOf(
-        ContainerKind.STACK to "Stack (reading pile / shelf grouping)",
+        ContainerKind.STACK to "Stack",
         ContainerKind.SHORT_BOX to "Short Box (~100 comics)",
         ContainerKind.LONG_BOX to "Long Box (~250 comics)",
     )
