@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Badge
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -93,6 +95,8 @@ internal fun LibraryScreen(
     var openFacet by remember { mutableStateOf<FacetKind?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
     var moveSheetEntry by remember { mutableStateOf<EntryId?>(null) }
+    // Box view is the default when browsing a specific container; grid otherwise.
+    var boxView by remember(activeContainer) { mutableStateOf(activeContainer != null) }
 
     LaunchedEffect(state.message) {
         state.message?.let { snackbar.showSnackbar(it.text); viewModel.dismissMessage() }
@@ -115,6 +119,14 @@ internal fun LibraryScreen(
                         }
                     },
                     actions = {
+                        if (activeContainer != null) {
+                            IconButton(onClick = { boxView = !boxView }) {
+                                Icon(
+                                    if (boxView) Icons.Filled.GridView else Icons.Filled.PhotoLibrary,
+                                    contentDescription = if (boxView) "Switch to grid" else "Switch to box view",
+                                )
+                            }
+                        }
                         TextButton(onClick = onOpenReleases) { Text("New Releases") }
                         TextButton(onClick = onOpenPullList) { Text("Pull List") }
                         TextButton(onClick = { menuOpen = true }) { Text("More") }
@@ -203,6 +215,13 @@ internal fun LibraryScreen(
                     else -> "No comics match these filters."
                 }
                 CenteredMessage(message, Modifier.weight(1f))
+            } else if (boxView && activeContainer != null) {
+                BoxBrowseContent(
+                    entries = state.entries,
+                    onOpenComic = onOpenComic,
+                    onMoveEntry = { moveSheetEntry = it },
+                    modifier = Modifier.weight(1f),
+                )
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = coverSize.gridMinDp.dp),
