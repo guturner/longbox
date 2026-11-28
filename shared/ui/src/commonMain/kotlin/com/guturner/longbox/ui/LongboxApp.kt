@@ -21,6 +21,7 @@ import com.guturner.longbox.domain.model.CreatorId
 import com.guturner.longbox.domain.model.PullListEntry
 import com.guturner.longbox.domain.model.StoryArcId
 import com.guturner.longbox.presentation.ComicDetailViewModel
+import com.guturner.longbox.presentation.ContainersState
 import com.guturner.longbox.presentation.ContainersViewModel
 import com.guturner.longbox.presentation.CreatorViewModel
 import com.guturner.longbox.presentation.LibraryViewModel
@@ -95,13 +96,13 @@ private fun SignedInApp(
     // "Go home" means back to the library list (used by deep screens like Creator/StoryArc).
     val goHome: () -> Unit = { nav.popBackStack(LibraryRoute, inclusive = false) }
     // Activity/window-scoped so filters survive navigating into details and back.
-    val library = viewModel {
+    val library: LibraryViewModel = viewModel {
         LibraryViewModel(graph.observeLibrary, graph.refreshCollection, graph.removeFromCollection, graph.sync, graph.containerRepository)
     }
-    val containersVm = viewModel { ContainersViewModel(graph.containerRepository) }
-    val containersState by containersVm.state.collectAsStateWithLifecycle()
-    val pullListVm = viewModel { PullListViewModel(graph.pullList, graph.collectionRepository, graph.getWeeklyReleases, graph.clock) }
-    val manualScan = viewModel(key = "manual-scan") { ScanViewModel(graph.scanComic, graph.checkOwnership, graph.nowMillis, containerRepository = graph.containerRepository) }
+    val containersVm: ContainersViewModel = viewModel { ContainersViewModel(graph.containerRepository) }
+    val containersState: ContainersState by containersVm.state.collectAsStateWithLifecycle()
+    val pullListVm: PullListViewModel = viewModel { PullListViewModel(graph.pullList, graph.collectionRepository, graph.getWeeklyReleases, graph.clock) }
+    val manualScan: ScanViewModel = viewModel(key = "manual-scan") { ScanViewModel(graph.scanComic, graph.checkOwnership, graph.nowMillis, containerRepository = graph.containerRepository) }
     var showManualEntry by remember { mutableStateOf(false) }
     var activeContainer by remember { mutableStateOf<Container?>(null) }
     val coverSize by graph.coverSize.collectAsStateWithLifecycle()
