@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.credentials.CredentialManager
@@ -29,10 +30,13 @@ class MainActivity : ComponentActivity() {
 
     private val app get() = application as LongboxApplication
     private var updateCheckDone = false
+    // Holds a pending deep-link container UUID (longbox://containers/{uuid}) so it survives recomposition.
+    private val pendingContainerId = mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        pendingContainerId.value = extractContainerId(intent)
         val platform = object : PlatformServices {
             override suspend fun requestGoogleIdToken(): String? = signInWithGoogle()
             override val scanner: ScannerContent = CameraBarcodeScanner
@@ -45,8 +49,24 @@ class MainActivity : ComponentActivity() {
                 bmp.asImageBitmap()
             }.getOrNull()
         }
-        setContent { LongboxApp(app.graph, platform) }
+        setContent {
+            LongboxApp(
+                app.graph,
+                platform,
+                pendingContainerId = pendingContainerId.value,
+                onContainerNavConsumed = { pendingContainerId.value = null },
+            )
+        }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingContainerId.value = extractContainerId(intent)
+    }
+
+    private fun extractContainerId(intent: Intent?): String? =
+        intent?.data?.takeIf { it.scheme == "longbox" && it.host == "containers" }?.lastPathSegment
 
     override fun onResume() {
         super.onResume()

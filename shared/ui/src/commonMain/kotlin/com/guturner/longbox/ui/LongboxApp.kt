@@ -3,6 +3,7 @@ package com.guturner.longbox.ui
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,9 +51,17 @@ import kotlinx.serialization.Serializable
 @Serializable internal data class ScanRoute(val check: Boolean)
 @Serializable internal data object ContainersRoute
 
-/** Root of every client. Platform shells only supply [graph] and [platform]. */
+/** Root of every client. Platform shells only supply [graph] and [platform].
+ * [pendingContainerId] is the UUID string from a deep link (longbox://containers/{uuid}), if any.
+ * [onContainerNavConsumed] is called once navigation has been triggered, so the host can clear it.
+ */
 @Composable
-fun LongboxApp(graph: AppGraph, platform: PlatformServices) {
+fun LongboxApp(
+    graph: AppGraph,
+    platform: PlatformServices,
+    pendingContainerId: String? = null,
+    onContainerNavConsumed: () -> Unit = {},
+) {
     val themeMode by graph.themeMode.collectAsStateWithLifecycle()
     val isDark = when (themeMode) {
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
@@ -65,7 +74,7 @@ fun LongboxApp(graph: AppGraph, platform: PlatformServices) {
             when (session.phase.collectAsStateWithLifecycle().value) {
                 SessionPhase.RESTORING -> CenteredMessage("Opening your longbox…")
                 SessionPhase.SIGNED_OUT -> SignInScreen(session)
-                SessionPhase.SIGNED_IN -> SignedInApp(graph, platform, themeMode, onSignOut = session::signOut, onThemeModeChange = graph::setThemeMode)
+                SessionPhase.SIGNED_IN -> SignedInApp(graph, platform, themeMode, onSignOut = session::signOut, onThemeModeChange = graph::setThemeMode, pendingContainerId = pendingContainerId, onContainerNavConsumed = onContainerNavConsumed)
             }
         }
     }
@@ -78,6 +87,8 @@ private fun SignedInApp(
     themeMode: ThemeMode,
     onSignOut: () -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
+    pendingContainerId: String? = null,
+    onContainerNavConsumed: () -> Unit = {},
 ) {
     val nav = rememberNavController()
     // "Go home" means back to the library list (used by deep screens like Creator/StoryArc).
@@ -178,6 +189,21 @@ private fun SignedInApp(
                 ScanViewModel(graph.scanComic, graph.checkOwnership, graph.nowMillis, if (check) ScanMode.CHECK else ScanMode.ADD)
             }
             ScanScreen(vm, scanner, onClose = { nav.popBackStack() })
+        }
+    }
+
+    // Deep-link navigation: longbox://containers/{uuid} → open that container's library view.
+    LaunchedEffect(pendingContainerId, containersState.containers) {
+        val id = pendingContainerId ?: return@LaunchedEffect
+        val container = containersState.containers.firstOrNull { it.id.value.toString() == id }
+        if (container != null) {
+            onContainerNavConsumed()
+            activeContainer = container
+            library.showOnly(LibraryFilter(containerIds = setOf(container.id)))
+            nav.navigate(LibraryRoute) {
+                popUpTo(ContainersRoute) { inclusive = false }
+                launchSingleTop = true
+            }
         }
     }
 
