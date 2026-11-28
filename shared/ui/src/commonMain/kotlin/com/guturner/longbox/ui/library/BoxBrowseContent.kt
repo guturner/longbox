@@ -3,7 +3,11 @@ package com.guturner.longbox.ui.library
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +47,7 @@ import com.guturner.longbox.domain.model.EntryState
 import com.guturner.longbox.ui.LocalPlatform
 import com.guturner.longbox.ui.components.PendingCover
 import kotlin.math.abs
+import kotlinx.coroutines.launch
 
 private const val PEEK_HEIGHT_DP = 56
 private const val PEEK_COVER_WIDTH_DP = 44
@@ -69,9 +75,15 @@ internal fun BoxBrowseContent(
     val pagerState = rememberPagerState(pageCount = { entries.size })
     val current = pagerState.currentPage
     val peekListState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(current) {
         peekListState.animateScrollToItem(current.coerceAtLeast(0))
+    }
+
+    // Drag state for the peek strip: drags scroll the pager, flings snap to nearest page.
+    val peekDraggable = rememberDraggableState { delta ->
+        scope.launch { pagerState.scroll { scrollBy(-delta) } }
     }
 
     Column(modifier.fillMaxSize()) {
@@ -160,9 +172,25 @@ internal fun BoxBrowseContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(PEEK_HEIGHT_DP.dp)
-                    .padding(bottom = 8.dp),
+                    .padding(bottom = 8.dp)
+                    // Drag on the strip drives the main pager; fling snaps to nearest page.
+                    .draggable(
+                        state = peekDraggable,
+                        orientation = Orientation.Horizontal,
+                        onDragStopped = { velocity ->
+                            scope.launch {
+                                val target = when {
+                                    velocity < -300 -> (current + 1).coerceAtMost(entries.size - 1)
+                                    velocity > 300 -> (current - 1).coerceAtLeast(0)
+                                    else -> current
+                                }
+                                pagerState.animateScrollToPage(target)
+                            }
+                        },
+                    ),
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
+                userScrollEnabled = false, // pager scroll handled by draggable above
             ) {
                 itemsIndexed(entries) { index, entry ->
                     val isCurrent = index == current
@@ -179,7 +207,8 @@ internal fun BoxBrowseContent(
                                     MaterialTheme.colorScheme.primary,
                                     RoundedCornerShape(3.dp),
                                 ) else Modifier,
-                            ),
+                            )
+                            .clickable { scope.launch { pagerState.animateScrollToPage(index) } },
                     ) {
                         entry.comic?.coverA?.imageUrl?.let { url ->
                             AsyncImage(
