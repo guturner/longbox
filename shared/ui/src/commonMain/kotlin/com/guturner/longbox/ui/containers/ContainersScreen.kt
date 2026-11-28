@@ -2,6 +2,7 @@ package com.guturner.longbox.ui.containers
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.Column
@@ -100,12 +101,14 @@ fun ContainersScreen(
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f),
                     )
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Filled.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.onSurface)
-                    }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(text = { Text("Browse all comics") }, onClick = { menuOpen = false; onBrowseAll() })
-                        DropdownMenuItem(text = { Text("Pull List") }, onClick = { menuOpen = false; onOpenPullList() })
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Filled.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.onSurface)
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(text = { Text("Browse all comics") }, onClick = { menuOpen = false; onBrowseAll() })
+                            DropdownMenuItem(text = { Text("Pull List") }, onClick = { menuOpen = false; onOpenPullList() })
+                        }
                     }
                 }
                 RainbowStripe()
