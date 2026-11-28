@@ -62,7 +62,10 @@ class ScanViewModel(
     /** Returns true if the detection was accepted (the UI uses this to vibrate / beep). */
     fun onDetected(mainCode: String, addOn: String?): Boolean {
         val key = mainCode + (addOn ?: "")
-        if (key in sessionCodes) return false
+        // Session de-dup: in ADD mode, block re-scanning a code that was already successfully
+        // added this session (prevents duplicate pending entries while offline). CHECK mode
+        // always re-queries so the user can confirm ownership after adding.
+        if (mutableState.value.mode == ScanMode.ADD && key in sessionCodes) return false
         val now = nowMillis()
         val last = lastHandled[key]
         if (inFlight == key || (last != null && now - last < REPEAT_WINDOW_MS)) return false

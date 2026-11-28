@@ -55,15 +55,27 @@ class ScanViewModelTest {
     @Test
     fun testCameraRepeatsAreIgnoredWithinWindow() {
         // Given / When
-        assertTrue(viewModel.onDetected("759606095582", "00111"))
+        assertTrue(viewModel.onDetected("759606095582", "00111"))  // accepted; added to sessionCodes
         now += 500
-        assertFalse(viewModel.onDetected("759606095582", "00111"))
+        assertFalse(viewModel.onDetected("759606095582", "00111")) // rejected: within repeat window
         now += 5_000
-        assertTrue(viewModel.onDetected("759606095582", "00111"))
+        // Session de-dup keeps this blocked even after the window expires (ADD mode).
+        // The user must close and reopen the scanner to scan the same code again.
+        assertFalse(viewModel.onDetected("759606095582", "00111"))
 
-        // Then
-        assertEquals(2, repo.scans.size)
-        assertEquals(2, viewModel.state.value.sessionCount)
+        // Then: only one successful scan
+        assertEquals(1, repo.scans.size)
+        assertEquals(1, viewModel.state.value.sessionCount)
+    }
+
+    @Test
+    fun testCheckModeIsNotSessionDeduped() {
+        // After adding a comic in ADD mode, switching to CHECK mode and re-scanning it should
+        // still produce a fresh ownership result (not be silently blocked by sessionCodes).
+        viewModel.onDetected("759606095582", "00111")           // ADD → added, in sessionCodes
+        now += 5_000                                            // advance past the repeat window
+        viewModel.setMode(ScanMode.CHECK)
+        assertTrue(viewModel.onDetected("759606095582", "00111")) // CHECK → allowed, not de-duped
     }
 
     @Test
