@@ -121,7 +121,12 @@ class LongboxApi(
 
     suspend inline fun <reified T> get(crossinline block: HttpRequestBuilder.() -> Unit): Outcome<T> =
         when (val result = send { block() }) {
-            is Outcome.Success -> Outcome.Success(result.value.body<T>())
+            is Outcome.Success -> try {
+                Outcome.Success(result.value.body<T>())
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Outcome.Failure(DomainError.Unexpected("Unexpected response format from server"))
+            }
             is Outcome.Failure -> result
         }
 
