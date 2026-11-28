@@ -1,9 +1,11 @@
 package com.guturner.longbox.data.repository
 
 import com.guturner.longbox.contract.API_V1
+import com.guturner.longbox.contract.CollectionEntryDto
 import com.guturner.longbox.contract.CollectionResponse
 import com.guturner.longbox.contract.ContractMapper
 import com.guturner.longbox.contract.CreatorDto
+import com.guturner.longbox.contract.MoveToContainerRequest
 import com.guturner.longbox.contract.ScanRequest
 import com.guturner.longbox.contract.StoryArcDto
 import com.guturner.longbox.data.local.CachedLibrary
@@ -14,6 +16,7 @@ import com.guturner.longbox.data.local.StoreKeys
 import com.guturner.longbox.data.remote.LongboxApi
 import com.guturner.longbox.domain.barcode.ComicBarcode
 import com.guturner.longbox.domain.model.CollectionEntry
+import com.guturner.longbox.domain.model.ContainerId
 import com.guturner.longbox.domain.model.DomainError
 import com.guturner.longbox.domain.model.EntryId
 import com.guturner.longbox.domain.model.EntryState
@@ -21,6 +24,7 @@ import com.guturner.longbox.domain.model.Outcome
 import com.guturner.longbox.domain.repository.CollectionRepository
 import com.guturner.longbox.domain.repository.SyncController
 import com.guturner.longbox.domain.repository.SyncState
+import io.ktor.client.call.body
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
@@ -87,9 +91,9 @@ class OfflineFirstCollectionRepository(
 
     override suspend fun refresh(): Outcome<Unit> = syncNow()
 
-    override suspend fun addScan(barcode: ComicBarcode): Outcome<CollectionEntry> {
+    override suspend fun addScan(barcode: ComicBarcode, targetContainerId: ContainerId?): Outcome<CollectionEntry> {
         loaded.await()
-        val change = PendingChange.AddScan(Uuid.random().toString(), nowMillis(), barcode.upc, barcode.supplement)
+        val change = PendingChange.AddScan(Uuid.random().toString(), nowMillis(), barcode.upc, barcode.supplement, targetContainerId?.value)
         enqueue(change)
         scope.launch { syncNow() }
         return Outcome.Success(asLocalEntry(change))
@@ -182,12 +186,37 @@ class OfflineFirstCollectionRepository(
     // ---- internals ----
 
     private suspend fun replay(change: PendingChange): Outcome<Unit> = when (change) {
-        is PendingChange.AddScan -> api.send {
-            method = HttpMethod.Post
-            url.takeFrom("$API_V1/collection/scans")
-            contentType(ContentType.Application.Json)
-            setBody(ScanRequest(change.code, change.addOn, clientMutationId = change.id, scannedAtEpochMillis = change.createdAtEpochMillis))
-        }.let { if (it is Outcome.Failure) it else Outcome.Success(Unit) }
+        is PendingChange.AddScan -> {
+            val scanResult = api.send {
+                method = HttpMethod.Post
+                url.takeFrom("$API_V1/collection/scans")
+                contentType(ContentType.Application.Json)
+                setBody(ScanRequest(change.code, change.addOn, clientMutationId = change.id, scannedAtEpochMillis = change.createdAtEpochMillis))
+            }
+            if (scanResult is Outcome.Failure) return scanResult
+            // If the scan was tagged with a target container, move the entry to it now that we
+            // have the server-assigned entry UUID from the scan response.
+            val targetContainerId = change.targetContainerId
+            if (targetContainerId != null) {
+                val scanResponse = (scanResult as? Outcome.Success)?.value
+                val entryId: String? = try {
+                    scanResponse?.body<CollectionEntryDto>()?.id
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    null
+                }
+                if (entryId != null) {
+                    api.send {
+                        method = HttpMethod.Post
+                        url.takeFrom("$API_V1/containers/$targetContainerId/entries")
+                        contentType(ContentType.Application.Json)
+                        setBody(MoveToContainerRequest(entryId))
+                    }
+                    // Container assignment is best-effort: if it fails we still count the scan as done.
+                }
+            }
+            Outcome.Success(Unit)
+        }
 
         is PendingChange.RemoveEntry -> api.send {
             method = HttpMethod.Delete

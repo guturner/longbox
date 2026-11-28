@@ -18,7 +18,7 @@ class FakeCollectionRepository(initial: List<CollectionEntry> = emptyList()) : C
     override fun observeEntries(): Flow<List<CollectionEntry>> = entries
     override suspend fun refresh(): Outcome<Unit> = Outcome.Success(Unit)
 
-    override suspend fun addScan(barcode: ComicBarcode): Outcome<CollectionEntry> {
+    override suspend fun addScan(barcode: ComicBarcode, targetContainerId: com.guturner.longbox.domain.model.ContainerId?): Outcome<CollectionEntry> {
         scanned += barcode
         val entry = CollectionEntry(EntryId("s${scanned.size}"), barcode.fullCode, EntryState.PENDING, null, null, 0)
         entries.value = entries.value + entry

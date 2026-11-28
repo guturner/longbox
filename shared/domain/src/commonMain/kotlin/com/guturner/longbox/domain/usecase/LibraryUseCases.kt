@@ -50,10 +50,14 @@ class ObserveLibraryUseCase(
 class ScanComicUseCase(
     private val collectionRepository: CollectionRepository,
 ) {
-    suspend operator fun invoke(mainCode: String, addOn: String?): Outcome<CollectionEntry> =
+    suspend operator fun invoke(
+        mainCode: String,
+        addOn: String?,
+        targetContainerId: com.guturner.longbox.domain.model.ContainerId? = null,
+    ): Outcome<CollectionEntry> =
         when (val parsed = ComicBarcode.parse(mainCode, addOn)) {
             is BarcodeParseResult.Invalid -> Outcome.Failure(DomainError.InvalidBarcode(parsed.error))
-            is BarcodeParseResult.Valid -> collectionRepository.addScan(parsed.barcode)
+            is BarcodeParseResult.Valid -> collectionRepository.addScan(parsed.barcode, targetContainerId)
         }
 }
 

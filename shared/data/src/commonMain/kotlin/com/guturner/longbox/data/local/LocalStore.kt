@@ -43,6 +43,8 @@ sealed interface PendingChange {
         override val createdAtEpochMillis: Long,
         val code: String,
         val addOn: String?,
+        /** If set, the entry is moved to this container immediately after the scan is confirmed by the server. */
+        val targetContainerId: String? = null,
     ) : PendingChange
 
     @Serializable

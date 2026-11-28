@@ -49,7 +49,7 @@ import kotlinx.serialization.Serializable
 @Serializable internal data class StoryArcRoute(val id: Long)
 @Serializable internal data object ReleasesRoute
 @Serializable internal data object PullListRoute
-@Serializable internal data class ScanRoute(val check: Boolean)
+@Serializable internal data class ScanRoute(val check: Boolean, val containerId: String? = null)
 @Serializable internal data object ContainersRoute
 
 /** Root of every client. Platform shells only supply [graph] and [platform].
@@ -130,7 +130,7 @@ private fun SignedInApp(
                 activeContainer = activeContainer,
                 onBack = { nav.popBackStack() },
                 onOpenComic = { nav.navigate(ComicRoute(it.value)) },
-                onScan = platform.scanner?.let { { nav.navigate(ScanRoute(check = false)) } },
+                onScan = platform.scanner?.let { { nav.navigate(ScanRoute(check = false, containerId = activeContainer?.id?.value)) } },
                 onCheckInShop = platform.scanner?.let { { nav.navigate(ScanRoute(check = true)) } },
                 onAddManually = { showManualEntry = true },
                 onOpenReleases = { nav.navigate(ReleasesRoute) },
@@ -186,9 +186,10 @@ private fun SignedInApp(
         }
         composable<ScanRoute> { entry ->
             val scanner = platform.scanner ?: return@composable
-            val check = entry.toRoute<ScanRoute>().check
-            val vm = viewModel(key = "scan-$check") {
-                ScanViewModel(graph.scanComic, graph.checkOwnership, graph.nowMillis, if (check) ScanMode.CHECK else ScanMode.ADD, graph.containerRepository)
+            val route = entry.toRoute<ScanRoute>()
+            val initialContainerId = route.containerId?.let { com.guturner.longbox.domain.model.ContainerId(it) }
+            val vm = viewModel(key = "scan-${route.check}-${route.containerId}") {
+                ScanViewModel(graph.scanComic, graph.checkOwnership, graph.nowMillis, if (route.check) ScanMode.CHECK else ScanMode.ADD, graph.containerRepository, initialContainerId)
             }
             ScanScreen(vm, scanner, onClose = { nav.popBackStack() })
         }

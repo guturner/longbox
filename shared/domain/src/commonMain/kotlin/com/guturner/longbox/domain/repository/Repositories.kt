@@ -27,7 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
 interface CollectionRepository {
     fun observeEntries(): Flow<List<CollectionEntry>>
     suspend fun refresh(): Outcome<Unit>
-    suspend fun addScan(barcode: ComicBarcode): Outcome<CollectionEntry>
+    suspend fun addScan(barcode: ComicBarcode, targetContainerId: ContainerId? = null): Outcome<CollectionEntry>
     suspend fun remove(id: EntryId): Outcome<Unit>
 }
 

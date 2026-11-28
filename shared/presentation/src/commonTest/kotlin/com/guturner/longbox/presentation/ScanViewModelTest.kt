@@ -37,7 +37,7 @@ class ScanViewModelTest {
         override fun observeEntries() = entries
         override suspend fun refresh() = Outcome.Success(Unit)
         override suspend fun remove(id: EntryId) = Outcome.Success(Unit)
-        override suspend fun addScan(barcode: ComicBarcode): Outcome<CollectionEntry> {
+        override suspend fun addScan(barcode: ComicBarcode, targetContainerId: com.guturner.longbox.domain.model.ContainerId?): Outcome<CollectionEntry> {
             scans += barcode.fullCode
             val entry = CollectionEntry(EntryId("local-${scans.size}"), barcode.fullCode, EntryState.PENDING, null, null, 0, isQueuedOnDevice = true)
             entries.value = entries.value + entry

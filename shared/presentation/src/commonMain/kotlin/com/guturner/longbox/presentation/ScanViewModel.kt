@@ -50,8 +50,13 @@ data class ScanFeedback(val code: String, val message: UiMessage)
  * Cameras report the same barcode many times per second, so a code is ignored if it was
  * handled within the last [REPEAT_WINDOW_MS]. Both modes work offline.
  *
- * In ADD mode, each successful scan is immediately moved to [ScanUiState.selectedContainerId]
- * (default: the oldest Stack). The user can change the target via [selectContainer].
+ * In ADD mode, each successful scan is queued with the [ScanUiState.selectedContainerId] so the
+ * entry lands in that container as soon as the server confirms the scan. The user can change the
+ * target via [selectContainer].
+ *
+ * @param initialContainerId Pre-select this container when the view model is created (e.g. the
+ * container the user was browsing when they tapped "Scan"). Falls back to the oldest Stack if null
+ * or not found.
  */
 class ScanViewModel(
     private val scanComic: ScanComicUseCase,
@@ -59,6 +64,7 @@ class ScanViewModel(
     private val nowMillis: () -> Long,
     initialMode: ScanMode = ScanMode.ADD,
     private val containerRepository: ContainerRepository,
+    private val initialContainerId: ContainerId? = null,
 ) : ViewModel() {
 
     private val mutableState = MutableStateFlow(ScanUiState(mode = initialMode))
@@ -73,13 +79,15 @@ class ScanViewModel(
         viewModelScope.launch {
             containerRepository.observeContainers().collect { all ->
                 mutableState.update { current ->
-                    // Auto-select the oldest Stack if nothing is selected yet.
-                    val autoSelected = all
-                        .filter { it.kind == ContainerKind.STACK }
-                        .minByOrNull { it.createdAtEpochMillis }
-                        ?.id
-                    val selected = current.selectedContainerId ?: autoSelected
-                    current.copy(containers = all, selectedContainerId = selected)
+                    // On first load: prefer initialContainerId (from navigation), then oldest Stack.
+                    val resolved = if (current.selectedContainerId != null) {
+                        current.selectedContainerId
+                    } else {
+                        val preferred = initialContainerId?.takeIf { id -> all.any { it.id == id } }
+                        preferred ?: all.filter { it.kind == ContainerKind.STACK }
+                            .minByOrNull { it.createdAtEpochMillis }?.id
+                    }
+                    current.copy(containers = all, selectedContainerId = resolved)
                 }
             }
         }
@@ -126,9 +134,9 @@ class ScanViewModel(
         mutableState.update { it.copy(duplicatePending = null) }
         viewModelScope.launch {
             val key = pending.mainCode + (pending.addOn ?: "")
-            val feedback = when (val result = scanComic(pending.mainCode, pending.addOn)) {
+            val containerId = mutableState.value.selectedContainerId
+            val feedback = when (val result = scanComic(pending.mainCode, pending.addOn, containerId)) {
                 is Outcome.Success -> {
-                    moveToSelectedContainer(result.value.id.value)
                     sessionCodes.add(key)
                     mutableState.update { it.copy(sessionCount = it.sessionCount + 1) }
                     val where = if (result.value.isQueuedOnDevice) "saved on this device until you're home" else "looking it up…"
@@ -157,9 +165,9 @@ class ScanViewModel(
             }
             return
         }
-        val feedback = when (val result = scanComic(mainCode, addOn)) {
+        val containerId = mutableState.value.selectedContainerId
+        val feedback = when (val result = scanComic(mainCode, addOn, containerId)) {
             is Outcome.Success -> {
-                moveToSelectedContainer(result.value.id.value)
                 sessionCodes.add(key)
                 mutableState.update { it.copy(sessionCount = it.sessionCount + 1) }
                 val where = if (result.value.isQueuedOnDevice) "saved on this device until you're home" else "looking it up…"
@@ -171,16 +179,6 @@ class ScanViewModel(
             }
         }
         mutableState.update { it.copy(recent = (listOf(feedback) + it.recent).take(MAX_RECENT)) }
-    }
-
-    private suspend fun moveToSelectedContainer(entryIdValue: String) {
-        val containerId = mutableState.value.selectedContainerId ?: return
-        containerRepository.moveToContainer(
-            com.guturner.longbox.domain.model.EntryId(entryIdValue),
-            containerId,
-        )
-        // Failure is silent — the comic was scanned successfully; container assignment
-        // is best-effort and will be retried on next sync if queued offline.
     }
 
     private suspend fun check(key: String, mainCode: String, addOn: String?) {

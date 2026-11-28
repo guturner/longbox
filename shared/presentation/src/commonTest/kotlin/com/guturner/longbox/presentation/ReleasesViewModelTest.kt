@@ -64,7 +64,7 @@ class ReleasesViewModelTest {
     private val fakeCollection = object : CollectionRepository {
         override fun observeEntries() = MutableStateFlow(emptyList<com.guturner.longbox.domain.model.CollectionEntry>())
         override suspend fun refresh() = Outcome.Success(Unit)
-        override suspend fun addScan(barcode: com.guturner.longbox.domain.barcode.ComicBarcode) = error("not needed")
+        override suspend fun addScan(barcode: com.guturner.longbox.domain.barcode.ComicBarcode, targetContainerId: com.guturner.longbox.domain.model.ContainerId?) = error("not needed")
         override suspend fun remove(id: com.guturner.longbox.domain.model.EntryId) = Outcome.Success(Unit)
     }
 
