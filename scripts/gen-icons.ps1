@@ -1,16 +1,32 @@
+param(
+    [string]$Source = ''
+)
+
+# If the caller didn't pass a source, ask interactively.
+if (-not $Source) {
+    $Source = Read-Host 'Path to 512x512 source PNG (e.g. ~/Downloads/icon.png)'
+    $Source = $Source.Trim('"').Trim("'")
+}
+
+# Expand ~ to the home directory for convenience.
+$Source = $Source -replace '^~', $HOME
+
 Add-Type -AssemblyName System.Drawing
-$source = 'C:\Users\guytu\Downloads\longbox-icons\android-chrome-512x512.png'
-$img = [System.Drawing.Image]::FromFile($source)
+$img = [System.Drawing.Image]::FromFile($Source)
+
+# Derive the repo root from this script's directory (scripts/ lives in the repo root).
+$repoRoot = Split-Path -Parent $PSScriptRoot
+
 $sizes = @{
-    'mipmap-mdpi' = 48
-    'mipmap-hdpi' = 72
-    'mipmap-xhdpi' = 96
-    'mipmap-xxhdpi' = 144
+    'mipmap-mdpi'    = 48
+    'mipmap-hdpi'    = 72
+    'mipmap-xhdpi'   = 96
+    'mipmap-xxhdpi'  = 144
     'mipmap-xxxhdpi' = 192
 }
 foreach ($dir in $sizes.Keys) {
     $sz = $sizes[$dir]
-    $outDir = "C:\workspace\longbox\androidApp\src\main\res\$dir"
+    $outDir = Join-Path $repoRoot "androidApp\src\main\res\$dir"
     New-Item -ItemType Directory -Force -Path $outDir | Out-Null
     $bmp = New-Object System.Drawing.Bitmap($sz, $sz)
     $g = [System.Drawing.Graphics]::FromImage($bmp)
@@ -22,4 +38,4 @@ foreach ($dir in $sizes.Keys) {
     Write-Host "Created $outDir ($sz x $sz)"
 }
 $img.Dispose()
-Write-Host "Done."
+Write-Host 'Done.'
