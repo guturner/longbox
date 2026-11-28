@@ -29,7 +29,7 @@ class ContainersViewModel(
     private val containers: ContainerRepository,
 ) : ViewModel() {
 
-    private val transient = MutableStateFlow(Transient())
+    private val transient = MutableStateFlow(Transient(isLoading = true))
     private data class Transient(val isLoading: Boolean = false, val message: UiMessage? = null)
 
     val state: StateFlow<ContainersState> =

@@ -3,6 +3,7 @@ package com.guturner.longbox.ui.containers
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -70,7 +71,7 @@ fun ContainersScreen(
 
     Scaffold(
         topBar = {
-            Column {
+            Column(Modifier.statusBarsPadding()) {
                 // Logo header
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),

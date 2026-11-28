@@ -88,7 +88,11 @@ class OfflineFirstContainerRepository(
         }
         return when (result) {
             is Outcome.Success -> {
-                val dto = result.value.body<ContainerDto>()
+                val dto = try { result.value.body<ContainerDto>() }
+                    catch (e: Exception) {
+                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        return Outcome.Failure(DomainError.Unexpected("Unexpected server response"))
+                    }
                 cacheMutex.withLock {
                     cache.value?.let { persistCache(it.copy(containers = it.containers + dto)) }
                         ?: persistCache(CachedContainers(listOf(dto), nowMillis()))
@@ -109,7 +113,11 @@ class OfflineFirstContainerRepository(
         }
         return when (result) {
             is Outcome.Success -> {
-                val dto = result.value.body<ContainerDto>()
+                val dto = try { result.value.body<ContainerDto>() }
+                    catch (e: Exception) {
+                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        return Outcome.Failure(DomainError.Unexpected("Unexpected server response"))
+                    }
                 cacheMutex.withLock {
                     cache.value?.let { cached ->
                         persistCache(cached.copy(containers = cached.containers.map { if (it.id == id.value) dto else it }))
