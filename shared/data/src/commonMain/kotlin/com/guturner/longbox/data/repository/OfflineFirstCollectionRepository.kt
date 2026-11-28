@@ -255,6 +255,7 @@ class OfflineFirstCollectionRepository(
         ownedCoverName = null,
         addedAtEpochMillis = change.createdAtEpochMillis,
         isQueuedOnDevice = true,
+        containerId = change.targetContainerId?.let { ContainerId(it) },
     )
 
     private suspend fun enqueue(change: PendingChange) = updateOutbox { it + change }
