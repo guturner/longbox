@@ -88,5 +88,5 @@ class AppGraph(
     val getCreator = GetCreatorUseCase(catalog)
     val getStoryArc = GetStoryArcUseCase(catalog)
     val getWeeklyReleases = GetWeeklyReleasesUseCase(catalog, clock)
-    val pullList: PullListRepository = KeyValueStorePullListRepository(localStore, appScope)
+    val pullList: PullListRepository = KeyValueStorePullListRepository(localStore, appScope, nowMillis)
 }

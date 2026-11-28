@@ -54,6 +54,9 @@ private data class StoredChecks(val weeks: Map<String, List<Long>> = emptyMap())
 class KeyValueStorePullListRepository(
     private val store: KeyValueStore,
     appScope: CoroutineScope,
+    /** Returns the current epoch millisecond; used to prune stale weekly entries on load. */
+    private val nowMillis: () -> Long = { 0L },
+    private val pruneWeeksOlderThan: Int = 8,
 ) : PullListRepository {
 
     private val state = MutableStateFlow<List<PullListEntry>>(emptyList())
@@ -70,13 +73,34 @@ class KeyValueStorePullListRepository(
             ?.let { runCatching { json.decodeFromString(StoredPullList.serializer(), it) }.getOrNull() }
             ?.let { state.value = it.entries.map { e -> e.toDomain() } }
 
+        val cutoff = CalendarDate.ofEpochDay(nowMillis() / 86_400_000L).plusDays(-(pruneWeeksOlderThan * 7L))
+
         store.read(CHECKS_KEY)
             ?.let { runCatching { json.decodeFromString(StoredChecks.serializer(), it) }.getOrNull() }
-            ?.let { checks.value = it.weeks.mapValues { (_, ids) -> ids.toSet() } }
+            ?.let { stored ->
+                val pruned = stored.weeks.filterKeys { key -> !isOlderThan(key, cutoff) }
+                checks.value = pruned.mapValues { (_, ids) -> ids.toSet() }
+                // Persist pruned version if anything was dropped.
+                if (pruned.size < stored.weeks.size) {
+                    store.write(CHECKS_KEY, json.encodeToString(StoredChecks.serializer(), StoredChecks(pruned)))
+                }
+            }
 
         store.read(SKIPS_KEY)
             ?.let { runCatching { json.decodeFromString(StoredChecks.serializer(), it) }.getOrNull() }
-            ?.let { skips.value = it.weeks.mapValues { (_, ids) -> ids.toSet() } }
+            ?.let { stored ->
+                val pruned = stored.weeks.filterKeys { key -> !isOlderThan(key, cutoff) }
+                skips.value = pruned.mapValues { (_, ids) -> ids.toSet() }
+                if (pruned.size < stored.weeks.size) {
+                    store.write(SKIPS_KEY, json.encodeToString(StoredChecks.serializer(), StoredChecks(pruned)))
+                }
+            }
+    }
+
+    /** Returns true if [weekKey] (ISO date string) is strictly before [cutoff]. */
+    private fun isOlderThan(weekKey: String, cutoff: CalendarDate): Boolean {
+        val date = CalendarDate.parse(weekKey) ?: return false
+        return date < cutoff
     }
 
     override fun observe(): Flow<List<PullListEntry>> = state.asStateFlow()

@@ -21,8 +21,10 @@ class PullListRepositoryTest {
 
     private val scope = TestScope(UnconfinedTestDispatcher())
 
-    private fun repo(store: InMemoryKeyValueStore = InMemoryKeyValueStore()) =
-        KeyValueStorePullListRepository(store, scope)
+    private fun repo(
+        store: InMemoryKeyValueStore = InMemoryKeyValueStore(),
+        nowMillis: () -> Long = { 0L },
+    ) = KeyValueStorePullListRepository(store, scope, nowMillis)
 
     private val dcEntry = PullListEntry.ByPublisher("DC Comics")
     private val batmanEntry = PullListEntry.BySeries(SeriesId(10), "Batman (2016)", "DC Comics")
@@ -220,6 +222,84 @@ class PullListRepositoryTest {
         val r2 = repo(store)
         val skipped = r2.observeWeekSkips(week1).first()
         assertEquals(setOf(comic1, comic2), skipped)
+    }
+
+    // — prune tests —
+
+    // "today" = 2026-11-28; cutoff = 56 days prior = 2026-10-03
+    // epoch day for 2026-11-28 = CalendarDate(2026,11,28).epochDay
+    private val nowEpochMillis: Long = CalendarDate(2026, 11, 28).epochDay * 86_400_000L
+
+    // older than 8 weeks before today → should be pruned
+    private val oldWeek = CalendarDate(2026, 9, 1)   // 2026-09-01, well before 2026-10-03
+
+    @Test
+    fun oldChecksArePrunedOnLoad() = runTest {
+        val store = InMemoryKeyValueStore()
+        // Populate old + recent checks via a "timeless" repo (nowMillis=0 → no pruning)
+        val r1 = repo(store, nowMillis = { 0L })
+        r1.toggleCheck(oldWeek, comic1)
+        r1.toggleCheck(week1,   comic2)   // week1 = 2026-11-23, recent
+
+        // Reload with real clock — old week should be pruned
+        val r2 = repo(store, nowMillis = { nowEpochMillis })
+        val oldChecked    = r2.observeWeekChecks(oldWeek).first()
+        val recentChecked = r2.observeWeekChecks(week1).first()
+        assertTrue(oldChecked.isEmpty(), "Old week checks should be pruned")
+        assertEquals(setOf(comic2), recentChecked)
+    }
+
+    @Test
+    fun oldSkipsArePrunedOnLoad() = runTest {
+        val store = InMemoryKeyValueStore()
+        val r1 = repo(store, nowMillis = { 0L })
+        r1.toggleSkip(oldWeek, comic1)
+        r1.toggleSkip(week1,   comic2)
+
+        val r2 = repo(store, nowMillis = { nowEpochMillis })
+        assertTrue(r2.observeWeekSkips(oldWeek).first().isEmpty(), "Old week skips should be pruned")
+        assertEquals(setOf(comic2), r2.observeWeekSkips(week1).first())
+    }
+
+    @Test
+    fun recentChecksAreRetainedOnLoad() = runTest {
+        val store = InMemoryKeyValueStore()
+        val r1 = repo(store, nowMillis = { 0L })
+        r1.toggleCheck(week1, comic1)
+        r1.toggleCheck(week2, comic2)   // week2 = 2026-11-30, also recent
+
+        val r2 = repo(store, nowMillis = { nowEpochMillis })
+        assertEquals(setOf(comic1), r2.observeWeekChecks(week1).first())
+        assertEquals(setOf(comic2), r2.observeWeekChecks(week2).first())
+    }
+
+    @Test
+    fun prunedDataIsRePersisted() = runTest {
+        val store = InMemoryKeyValueStore()
+        val r1 = repo(store, nowMillis = { 0L })
+        r1.toggleCheck(oldWeek, comic1)
+        r1.toggleCheck(week1,   comic2)
+
+        // Load with pruning — triggers re-persist of trimmed data
+        repo(store, nowMillis = { nowEpochMillis })
+
+        // A third repo load (nowMillis=0 again) should still not see the old week,
+        // because the pruned snapshot was written back to the store
+        val r3 = repo(store, nowMillis = { 0L })
+        assertTrue(r3.observeWeekChecks(oldWeek).first().isEmpty())
+        assertEquals(setOf(comic2), r3.observeWeekChecks(week1).first())
+    }
+
+    @Test
+    fun noPruningWhenNowMillisIsZero() = runTest {
+        // Default nowMillis={0L} means cutoff is day 0 − 56 = negative → nothing pruned
+        val store = InMemoryKeyValueStore()
+        val r1 = repo(store, nowMillis = { 0L })
+        r1.toggleCheck(oldWeek, comic1)
+
+        val r2 = repo(store, nowMillis = { 0L })
+        // With zero clock, nothing is pruned — data survives
+        assertEquals(setOf(comic1), r2.observeWeekChecks(oldWeek).first())
     }
 
     // — helpers —
